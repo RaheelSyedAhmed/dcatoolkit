@@ -550,6 +550,9 @@ class StructureInformation:
     def __init__(self, structure, pdbx_file: pdbx.CIFFile):
         self.structure = structure
         self.pdbx_file = pdbx_file
+        strand_ids = []
+        align_beg = []
+        auth_align_beg = []
         # Obtain struct ref seq information (chain names, beginning residue, and the corresponding protein beginning residue)
         for col_name, col in self.pdbx_file[list(self.pdbx_file.keys())[0]]['struct_ref_seq'].items():
             if col_name == "pdbx_strand_id":
@@ -631,6 +634,7 @@ class StructureInformation:
         tuple of biotite.structure.AtomArray, biotite.structure.AtomArray
             Two AtomArrays that refer to atoms in the first chain and second chain, respectively without accounting for the presence of heteroatoms if `remove_hetero` is True.
         """
+        selected_structure = self.structure
         if remove_hetero:
             # Remove hetero atoms via hetero column of structure ndarray
             selected_structure = self.structure[self.structure.hetero == False]
@@ -681,6 +685,8 @@ class StructureInformation:
         min_dist_pairs_atoms_arr : numpy.ndarray
             Structured ndarray that has residue indices, auth residue indices (corresponding to the protein numbering), and atomic names in the format {'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,str,str]}
         """
+        shift1 = 0
+        shift2 = 0
         for row in list(self.struct_ref_seq):
             ref_seq_chain, ref_seq_beg, auth_ref_seq_beg = row
             if ref_seq_chain == chain1:
