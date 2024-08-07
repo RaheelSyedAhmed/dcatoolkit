@@ -15,4 +15,5 @@ RA_nkll = ResidueAlignment.load_from_align_file("examples/files/2kll_align")
 
 # Attempt finding ranked mapped DIs
 print(beta_trefoil_DDID.get_ranked_mapped_pairs(RA_nkll, RA_nkll, True))
-DirectInformationData.write_DI_data("beta_trefoil_trial_rm_DI.DI", beta_trefoil_DDID.get_ranked_mapped_pairs(RA_nkll, RA_nkll, False))
+DirectInformationData.write_DI_data("examples/outputs/beta_trefoil_trial_rm_DI.DI", beta_trefoil_DDID.get_ranked_mapped_pairs(RA_nkll, RA_nkll, False))
+DirectInformationData.write_DI_data("examples/outputs/beta_trefoil_trial_rm.DI", beta_trefoil_DDID.get_ranked_mapped_pairs(RA_nkll, RA_nkll, True))
