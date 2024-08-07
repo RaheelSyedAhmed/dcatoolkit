@@ -1,5 +1,5 @@
 import numpy as np
-from ..dcatoolkit.representation import DirectInformationData, StructureInformation
+from src.dcatoolkit.representation import DirectInformationData, StructureInformation
 
 s = StructureInformation.fetch_pdb("6AVJ")
 ndarray_test = np.array([(1,2,5.0), (3,4,6.0)])
