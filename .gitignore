@@ -1,3 +1,5 @@
 
 .DS_Store
 /src/dcatoolkit/__pycache__
+/src/dcatoolkit.egg-info
+/dist
