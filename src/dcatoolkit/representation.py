@@ -129,6 +129,8 @@ class Pairs:
         # Check to see if user requested mirrored pairs, if so, add in pairs that are mirrored across diagonal
         pairs = Pairs.subset_pairs(pairs, number)
         if mirror:
+            if pairs.dtype.names is not None:
+                pairs = np.array([[*pair] for pair in pairs])
             pairs = Pairs.mirror_pairs(pairs, mirror)
         return pairs
 
