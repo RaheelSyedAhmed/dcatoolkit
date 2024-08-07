@@ -3,3 +3,4 @@
 /src/dcatoolkit/__pycache__
 /src/dcatoolkit.egg-info
 /dist
+/examples/__pycache__
