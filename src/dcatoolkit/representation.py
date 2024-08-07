@@ -564,7 +564,7 @@ class StructureInformation:
             if col_name == "pdbx_auth_seq_align_beg": 
                     auth_align_beg = col.data.array
         # Put all three lists together
-        self.struct_ref_seq = zip(strand_ids, align_beg, auth_align_beg)
+        self.struct_ref_seq = list(zip(strand_ids, align_beg, auth_align_beg))
                 
     @staticmethod
     def fetch_pdb(pdb_id: str, model_num: int=1, struc_format: str="mmcif") -> 'StructureInformation':
@@ -669,6 +669,32 @@ class StructureInformation:
         dist_matrix = cdist(chain1_structure.coord, chain2_structure.coord)
         return (chain1_structure, chain2_structure, dist_matrix)
     
+    def get_shift_values(self, chain1: str, chain2: str) -> tuple[int, int]:
+        """
+        Get shift values needed for production of auth residue ids.
+        
+        Parameters
+        ----------
+        chain1 : str
+            Name of the chain id present in the struct_ref_seq block of cif files referring to the second column of residues.
+        chain2 : str
+            Name of the chain id present in the struct_ref_seq block of cif files referring to the second column of residues.
+
+        Returns
+        -------
+        (shift1, shift2) : tuple of int, int
+            Tuple containing both shift values, the difference between the auth_res_id and res_id.
+        """
+        shift1 = 0
+        shift2 = 0
+        for row in self.struct_ref_seq:
+            ref_seq_chain, ref_seq_beg, auth_ref_seq_beg = row
+            if ref_seq_chain == chain1:
+                shift1 = int(auth_ref_seq_beg) - int(ref_seq_beg)
+            if ref_seq_chain == chain2:
+                shift2 = int(auth_ref_seq_beg) - int(ref_seq_beg)
+        return shift1, shift2
+
     def get_min_dist_atom_info(self, pairs: npt.NDArray, chain1: str, chain2: str) -> npt.NDArray:
         """
         Generate a ndarray of residue ids and their corresponding atom names such that the distance is the minimum between the initial residues provided.
@@ -687,15 +713,7 @@ class StructureInformation:
         min_dist_pairs_atoms_arr : numpy.ndarray
             Structured ndarray that has residue indices, auth residue indices (corresponding to the protein numbering), and atomic names in the format {'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,str,str]}
         """
-        shift1 = 0
-        shift2 = 0
-        for row in list(self.struct_ref_seq):
-            ref_seq_chain, ref_seq_beg, auth_ref_seq_beg = row
-            if ref_seq_chain == chain1:
-                shift1 = int(auth_ref_seq_beg) - int(ref_seq_beg)
-            if ref_seq_chain == chain2:
-                shift2 = int(auth_ref_seq_beg) - int(ref_seq_beg)
-            
+        shift1, shift2 = self.get_shift_values(chain1, chain2)
         chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only=False, chain1=chain1, chain2=chain2, remove_hetero=True)
         min_dist_pairs_atoms = []
         for row in pairs:
@@ -715,7 +733,7 @@ class StructureInformation:
         min_dist_pairs_atoms_arr = np.array(min_dist_pairs_atoms, dtype={'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']})
         return min_dist_pairs_atoms_arr
 
-    def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str) -> set[tuple[int, int]]:
+    def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str, auth_contacts: bool=False) -> set[tuple[int, int]]:
         """
         Get contacts from the structure attribute where the distance between two residues is less than the threshold.
 
@@ -729,15 +747,47 @@ class StructureInformation:
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
             Chain id corresponding to the second column of residues in the structure.
+        auth_contacts : bool
+            True if supplying alt_ids for residues indices, False if cif residue indexing is needed.
 
         Returns
         -------
         contacts_set : set of tuple of ints
             Set of contacts, tuples with "residue1" and "residue2" from the structure that are within the distance threshold.
         """
+        shift1, shift2 = self.get_shift_values(chain1, chain2)
         chain1_structure, chain2_structure, dist_matrix = self.generate_dist_matrix(ca_only, chain1, chain2)
-        contacts = np.argwhere(dist_matrix <= threshold)
+        thresh_ind = np.argwhere(dist_matrix <= threshold)
         contacts_set = set()
-        for contact in contacts:
-            contacts_set.add((chain1_structure[contact[0]].res_id, chain2_structure[contact[1]].res_id))
+        for indices in thresh_ind:
+            chain1_atom = chain1_structure[indices[0]]
+            chain2_atom = chain2_structure[indices[1]]
+            res1 = chain1_atom.res_id
+            res2 = chain2_atom.res_id
+            if not(ca_only and res1 >= res2):
+                if auth_contacts:
+                    contacts_set.add((res1 + shift1, res2 + shift2))
+                else:
+                    contacts_set.add((res1, res2))
         return contacts_set
+    
+    @staticmethod
+    def write_contacts_set(filepath : str, contacts_set : set[tuple[int, int]]) -> None:
+        """
+        Write the contacts generated from get_contacts or general set of tuples of pairs.
+
+        Parameters
+        ----------
+        filepath : str
+            Path of file to output contacts_set to.
+        contacts_set : set of tuple of int, int
+            Set of tuples of pairs that represent contacts.
+        
+        Returns
+        -------
+        None
+        """
+        contacts_list = list(sorted(contacts_set))
+        with open(filepath, 'w') as fs:
+            for pair in contacts_list:
+                fs.write(str(pair[0]) + "\t" + str(pair[1]) + "\n")
