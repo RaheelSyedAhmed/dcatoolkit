@@ -552,19 +552,28 @@ class StructureInformation:
     def __init__(self, structure, pdbx_file: pdbx.CIFFile):
         self.structure = structure
         self.pdbx_file = pdbx_file
-        strand_ids = []
-        align_beg = []
-        auth_align_beg = []
+
+        if len(pdbx_file.keys()) > 0:
+            self.first_block = list(pdbx_file)[0]
+            struct_ref_seq_category = self.pdbx_file[self.first_block].get('struct_ref_seq')
+        else:
+            struct_ref_seq_category = None
         # Obtain struct ref seq information (chain names, beginning residue, and the corresponding protein beginning residue)
-        for col_name, col in self.pdbx_file[list(self.pdbx_file.keys())[0]]['struct_ref_seq'].items():
-            if col_name == "pdbx_strand_id":
-                    strand_ids = col.data.array
-            if col_name == "seq_align_beg":
-                    align_beg = col.data.array
-            if col_name == "pdbx_auth_seq_align_beg": 
-                    auth_align_beg = col.data.array
-        # Put all three lists together
-        self.struct_ref_seq = list(zip(strand_ids, align_beg, auth_align_beg))
+        if struct_ref_seq_category is not None:
+            strand_ids = []
+            align_beg = []
+            auth_align_beg = []
+            for col_name, col in struct_ref_seq_category.items():
+                if col_name == "pdbx_strand_id":
+                        strand_ids = col.data.array
+                if col_name == "seq_align_beg":
+                        align_beg = col.data.array
+                if col_name == "pdbx_auth_seq_align_beg": 
+                        auth_align_beg = col.data.array
+            # Put all three lists together
+            self.struct_ref_seq = list(zip(strand_ids, align_beg, auth_align_beg))
+        else:
+            self.struct_ref_seq = []
                 
     @staticmethod
     def fetch_pdb(pdb_id: str, model_num: int=1, struc_format: str="mmcif") -> 'StructureInformation':
@@ -687,13 +696,22 @@ class StructureInformation:
         """
         shift1 = 0
         shift2 = 0
-        for row in self.struct_ref_seq:
-            ref_seq_chain, ref_seq_beg, auth_ref_seq_beg = row
-            if ref_seq_chain == chain1:
-                shift1 = int(auth_ref_seq_beg) - int(ref_seq_beg)
-            if ref_seq_chain == chain2:
-                shift2 = int(auth_ref_seq_beg) - int(ref_seq_beg)
-        return shift1, shift2
+        if self.struct_ref_seq:
+            for row in self.struct_ref_seq:
+                ref_seq_chain, ref_seq_beg, auth_ref_seq_beg = row
+                if ref_seq_chain == chain1:
+                    shift1 = int(auth_ref_seq_beg) - int(ref_seq_beg)
+                if ref_seq_chain == chain2:
+                    shift2 = int(auth_ref_seq_beg) - int(ref_seq_beg)
+            return shift1, shift2
+        else: 
+            atom_site_category = self.pdbx_file[self.first_block].get('atom_site')
+            if atom_site_category:
+                return 0, 0
+            else:
+                return 0, 0
+
+        
 
     def get_min_dist_atom_info(self, pairs: npt.NDArray, chain1: str, chain2: str) -> npt.NDArray:
         """
@@ -764,7 +782,7 @@ class StructureInformation:
             chain2_atom = chain2_structure[indices[1]]
             res1 = chain1_atom.res_id
             res2 = chain2_atom.res_id
-            if not(ca_only and res1 >= res2):
+            if not(chain1==chain2 and res1 >= res2):
                 if auth_contacts:
                     contacts_set.add((res1 + shift1, res2 + shift2))
                 else:
