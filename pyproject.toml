@@ -46,6 +46,7 @@ tests = [
 ]
 docs = [
   "sphinx",
+  "pdoc",
   "numpydoc"
 ]
 lint = [
