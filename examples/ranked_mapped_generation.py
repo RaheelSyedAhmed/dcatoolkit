@@ -1,11 +1,12 @@
 from src.dcatoolkit.representation import DirectInformationData, ResidueAlignment
 import numpy as np
 
-
+# Testing of DirectInformationData loading from two separate files.
 beta_trefoil_IDID = DirectInformationData.load_from_dca_output("examples/files/Beta_Trefoil_MSA_1.info")
 beta_trefoil_DDID = DirectInformationData.load_from_DI_file("examples/files/Beta_Trefoil_MSA_1.DI")
 print(beta_trefoil_DDID.DI_data)
 print(beta_trefoil_IDID.DI_data)
+
 # Make sure they load the same
 #print(np.all(beta_trefoil_DDID.DI_data == beta_trefoil_IDID.DI_data, where=True))
 
