@@ -582,6 +582,19 @@ class StructureInformation:
         mmCIF file that contains generic information and atomic information of the protein structure categorized into mmCIF blocks.
     model_num : int
         The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
+
+    Attributes
+    ----------
+    self.atom_data : numpy.ndarray, optional
+        Entries in the format 'ATOM', residue index, chain ID, auth residue index, auth chain ID, model number
+    self.het_atom_data : numpy.ndarray, optional
+        Array of entries in the format 'HETATM', residue index, chain ID, auth residue index, auth chain ID, model number
+    self.unique_chains : numpy.ndarray, optional
+        Array of unique asym_id entries which corresponds to unique chain IDs.
+    self.chain_auth_dict : dict of str, str, optional
+        Uses chain id as a key and provides auth chain id as a value. 
+    self.res_auth_dict : dict of str, tuple of int, int or optional 
+        Uses chain id as a key and an array of residue index and auth residue index as a value.
     """
     def __init__(self, structure, pdbx_file: pdbx.CIFFile, model_num: int):
         self.structure = structure
@@ -592,17 +605,10 @@ class StructureInformation:
     def generate_auth_info(self) -> None:
         """
         Ran as part of constructor function. Generates information needed to access auth information including auth_seq_id and auth_asym_id, which correspond to alternative chain ids and alternative residue indices.
-        Makes the following variables:
-            self.atom_data : numpy.ndarray
-                Entries in the format 'ATOM', residue index, chain ID, auth residue index, auth chain ID, model number
-            self.het_atom_data : numpy.ndarray
-                Array of entries in the format 'HETATM', residue index, chain ID, auth residue index, auth chain ID, model number
-            self.unique_chains : numpy.ndarray
-                Array of unique asym_id entries which corresponds to unique chain IDs.
-            self.chain_auth_dict : dict of str, str
-                Uses chain id as a key and provides auth chain id as a value. 
-            self.res_auth_dict : dict of str, tuple of int, int
-                Uses chain id as a key and an array of residue index and auth residue index as a value.
+        
+        Note
+        ----
+        See attributes for details.
         
         Returns
         -------
