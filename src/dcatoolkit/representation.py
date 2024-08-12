@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from collections.abc import Iterable
 from scipy.spatial.distance import cdist
 
 import biotite.structure.io.pdbx as pdbx
@@ -462,6 +463,42 @@ class DirectInformationData:
         """
         return DI_data[abs(DI_data['residue1'] - DI_data['residue2']) > 4]
     
+    @staticmethod
+    def find_DI_with_residues(critical_residues_1 : Iterable[int], critical_residues_2 : Iterable[int], max_rank: Optional[int]=None, *mapped_resi_arrs: Iterable[npt.NDArray]) -> list[tuple[list, int]]:
+        """
+        Function that takes an n number of ranked, mapped DI pairs and checks to see if they're in a list of potential residue indices.
+        
+        Parameters
+        ----------
+        critical_residues_1 : collections.abc.Iterable of int
+            Specific residue indices that a DI pair will be compared to. If the first residue of the DI pair is not one of these indices, it will not be appended to results.
+        crtical_residues_2 : collections.abc.Iterable of int
+            Specific residue indices that a DI pair will be compared to. If the second residue of the DI pair is not one of these indices, it will not be appended to results.
+        threshold : int, optional
+            Maximum "rank" of the DI pair considered.
+        *mapped_resi_arrs : tuple of numpy.ndarray
+            Tuple of ranked, mapped pairs that are compared to critical residue indices and appended to results if in those indices and within threshold.
+        
+        Returns
+        -------
+        results : list of tuple of list of int, int
+            Results which consist of tuples where the first element is a list of residue1, residue2, and DI score, whereas the second element is the rank.
+        """
+        results = []
+        for mapped_resi_arr in mapped_resi_arrs:
+            # count_rank represents the rank of the DI pair being evaluated, iterating over every new row considered.
+            count_rank = 0
+            for row in mapped_resi_arr:
+                row_as_list = list(row)
+                count_rank += 1
+                if max_rank:
+                    if row_as_list[0] in critical_residues_1 and row_as_list[1] in critical_residues_2 and count_rank <= max_rank:
+                        results.append((row_as_list, count_rank))
+                else:
+                    if row_as_list[0] in critical_residues_1 and row_as_list[1] in critical_residues_2:
+                        results.append((row_as_list, count_rank))
+        return results
+
     @staticmethod
     def get_dist_commands(model1: str | int, model2: str | int, chain1: str, chain2: str, pairs: npt.NDArray, ca_only: bool=True, auth_res_ids=False) -> list[str]:
         """

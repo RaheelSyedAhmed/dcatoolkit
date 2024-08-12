@@ -3,20 +3,6 @@ import numpy.typing as npt
 from collections.abc import Iterable
 from src.dcatoolkit.representation import DirectInformationData, StructureInformation, ResidueAlignment
 
-# Function that takes an n number of ranked, mapped DI pairs and checks to see if they're in a list of potential residue indices.
-# A threshold can also be provided to limit the rank of the pairs evaluated.
-def find_DI_by_resi(critical_residues_1 : Iterable[int], critical_residues_2 : Iterable[int], threshold: int=300, *mapped_resi_arrs: Iterable[npt.NDArray]):
-    results = []
-    for mapped_resi_arr in mapped_resi_arrs:
-        # count_rank represents the rank of the DI pair being evaluated, iterating over every new row considered.
-        count_rank = 0
-        for row in mapped_resi_arr:
-            row = list(row)
-            count_rank += 1
-            if row[0] in critical_residues_1 and row[1] in critical_residues_2 and count_rank <= threshold:
-                results.append((row, count_rank))
-    return results
-
 # Reading in top 5 scoring AlphaFold3 models produced.
 btr1_complex_0 = StructureInformation.read_pdb_mmCIF("examples/files/fold_cry1ab_ec12_model_0.cif")
 btr1_complex_1 = StructureInformation.read_pdb_mmCIF("examples/files/fold_cry1ab_ec12_model_1.cif")
@@ -50,15 +36,15 @@ C_R = btr1_complex_DI.get_ranked_mapped_pairs(ResidueAlignment.load_from_align_f
 contacts_critical = {15,16,17,18,19,20,103,104,105,106,107,108}
 
 # Printing out results, the DI pairs constricted to the residue indices specified and within the rank threshold of 300.
-print(find_DI_by_resi(cry1_contacts_0, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_0, contacts_critical, 300, M_R, C_R))
 print()
-print(find_DI_by_resi(cry1_contacts_1, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_1, contacts_critical, 300, M_R, C_R))
 print()
-print(find_DI_by_resi(cry1_contacts_2, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_2, contacts_critical, 300, M_R, C_R))
 print()
-print(find_DI_by_resi(cry1_contacts_3, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_3, contacts_critical, 300, M_R, C_R))
 print()
-print(find_DI_by_resi(cry1_contacts_4, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_4, contacts_critical, 300, M_R, C_R))
 
 # Writing out information of contacts within a threshold to a file.
 StructureInformation.write_contacts_set("examples/outputs/btr1_complex_contacts_0",btr1_complex_0.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_contacts=True))
