@@ -543,38 +543,72 @@ class StructureInformation:
         Structure obtained from an RCSB entry with a provided pdbx/mmcif file with a specified model number.
     pdbx_file : biotite.io.pdbx.CIFFile
         mmCIF file that contains generic information and atomic information of the protein structure categorized into mmCIF blocks.
-
-    Attributes
-    ----------
-    struct_ref_seq : zip
-        zipped version of parallel arrays that contain chain ids, beginning align indices of the sequence, and beginning align indices of the auth sequence.
+    model_num : int
+        The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
     """
-    def __init__(self, structure, pdbx_file: pdbx.CIFFile):
+    def __init__(self, structure, pdbx_file: pdbx.CIFFile, model_num: int):
         self.structure = structure
         self.pdbx_file = pdbx_file
+        self.model_num = model_num
+        self.generate_auth_info()
 
-        if len(pdbx_file.keys()) > 0:
-            self.first_block = list(pdbx_file)[0]
-            struct_ref_seq_category = self.pdbx_file[self.first_block].get('struct_ref_seq')
+    def generate_auth_info(self) -> None:
+        """
+        Ran as part of constructor function. Generates information needed to access auth information including auth_seq_id and auth_asym_id, which correspond to alternative chain ids and alternative residue indices.
+        Makes the following variables:
+            self.atom_data : numpy.ndarray
+                Entries in the format 'ATOM', residue index, chain ID, auth residue index, auth chain ID, model number
+            self.het_atom_data : numpy.ndarray
+                Array of entries in the format 'HETATM', residue index, chain ID, auth residue index, auth chain ID, model number
+            self.unique_chains : numpy.ndarray
+                Array of unique asym_id entries which corresponds to unique chain IDs.
+            self.chain_auth_dict : dict of str, str
+                Uses chain id as a key and provides auth chain id as a value. 
+            self.res_auth_dict : dict of str, tuple of int, int
+                Uses chain id as a key and an array of residue index and auth residue index as a value.
+        
+        Returns
+        -------
+        None
+        """
+        if len(self.pdbx_file.keys()) > 0:
+            self.first_block = list(self.pdbx_file)[0]
+            self.atom_site_category = self.pdbx_file[self.first_block].get('atom_site')
+            self.chain_auth_dict = {}
+            self.res_auth_dict = {}
+            if self.atom_site_category:
+                group_pdbs = []
+                seq_ids = []
+                asym_ids = []
+                auth_seq_ids = []
+                auth_asym_ids = []
+                model_nums = []
+                for col_name, col in self.atom_site_category.items():
+                    if col_name == 'group_PDB':
+                        group_pdbs = col.as_array()
+                    elif col_name == 'label_seq_id':
+                        seq_ids = col.as_array()
+                    elif col_name == 'label_asym_id':
+                        asym_ids = col.as_array()
+                    elif col_name == 'auth_seq_id':
+                        auth_seq_ids = col.as_array()
+                    elif col_name == 'auth_asym_id':
+                        auth_asym_ids = col.as_array()
+                    elif col_name == 'pdbx_PDB_model_num':
+                        model_nums = col.as_array()
+
+                atom_site_data = np.unique(np.column_stack((group_pdbs, seq_ids, asym_ids, auth_seq_ids, auth_asym_ids, model_nums)), axis=0)
+                atom_site_data = atom_site_data[atom_site_data[:,5] == str(self.model_num)]
+                self.atom_data = atom_site_data[atom_site_data[:,0] == "ATOM"]
+                self.het_atom_data = atom_site_data[atom_site_data[:,0] == "HETATM"]
+                self.unique_chains = np.unique(self.atom_data[:,2])
+                for unique_chain in self.unique_chains:
+                    unique_entry = self.atom_data[self.atom_data[:,2] == unique_chain][0]
+                    self.chain_auth_dict[unique_entry[2]] = unique_entry[4]
+                    self.res_auth_dict[unique_entry[2]] = unique_entry[[1,3]].astype('int')
         else:
-            struct_ref_seq_category = None
-        # Obtain struct ref seq information (chain names, beginning residue, and the corresponding protein beginning residue)
-        if struct_ref_seq_category is not None:
-            strand_ids = []
-            align_beg = []
-            auth_align_beg = []
-            for col_name, col in struct_ref_seq_category.items():
-                if col_name == "pdbx_strand_id":
-                        strand_ids = col.data.array
-                if col_name == "seq_align_beg":
-                        align_beg = col.data.array
-                if col_name == "pdbx_auth_seq_align_beg": 
-                        auth_align_beg = col.data.array
-            # Put all three lists together
-            self.struct_ref_seq = list(zip(strand_ids, align_beg, auth_align_beg))
-        else:
-            self.struct_ref_seq = []
-                
+            self.atom_site_category = None
+
     @staticmethod
     def fetch_pdb(pdb_id: str, model_num: int=1, struc_format: str="mmcif") -> 'StructureInformation':
         """
@@ -603,7 +637,7 @@ class StructureInformation:
         if fetched_data is None:
             raise TypeError("RCSB fetch failed. Try fetch again.")
         pdbx_file = pdbx.CIFFile.read(fetched_data)
-        return StructureInformation(pdbx.get_structure(pdbx_file=pdbx_file, model=model_num, use_author_fields=False), pdbx_file)
+        return StructureInformation(pdbx.get_structure(pdbx_file=pdbx_file, model=model_num, use_author_fields=False), pdbx_file, model_num)
     
     @staticmethod
     def read_pdb_mmCIF(pdb_filepath: str, model_num: int=1) -> 'StructureInformation':
@@ -623,7 +657,7 @@ class StructureInformation:
             StructureInformation generated from pdbx.get_structure() function using the pdbx file fetched from RCSB. The pdbx file is also supplied as an argument.
         """
         pdbx_file = pdbx.CIFFile.read(pdb_filepath)
-        return StructureInformation(pdbx.get_structure(pdbx_file, model=model_num, use_author_fields=False), pdbx_file)
+        return StructureInformation(pdbx.get_structure(pdbx_file, model=model_num, use_author_fields=False), pdbx_file, model_num)
     
     def get_chain_specific_structure(self, ca_only: bool, chain1: str, chain2: str, remove_hetero=True) -> tuple:
         """
@@ -696,22 +730,12 @@ class StructureInformation:
         """
         shift1 = 0
         shift2 = 0
-        if self.struct_ref_seq:
-            for row in self.struct_ref_seq:
-                ref_seq_chain, ref_seq_beg, auth_ref_seq_beg = row
-                if ref_seq_chain == chain1:
-                    shift1 = int(auth_ref_seq_beg) - int(ref_seq_beg)
-                if ref_seq_chain == chain2:
-                    shift2 = int(auth_ref_seq_beg) - int(ref_seq_beg)
+        if self.atom_site_category:
+            shift1 = abs(self.res_auth_dict[chain1][0] - self.res_auth_dict[chain1][1])
+            shift2 = abs(self.res_auth_dict[chain2][0] - self.res_auth_dict[chain2][1])
             return shift1, shift2
-        else: 
-            atom_site_category = self.pdbx_file[self.first_block].get('atom_site')
-            if atom_site_category:
-                return 0, 0
-            else:
-                return 0, 0
-
-        
+        else:
+            return shift1, shift2
 
     def get_min_dist_atom_info(self, pairs: npt.NDArray, chain1: str, chain2: str) -> npt.NDArray:
         """
@@ -747,7 +771,7 @@ class StructureInformation:
             # Generate the auth ids of the residues in the pairs ndarray
             auth_res_id1 = row['residue1'] + shift1
             auth_res_id2 = row['residue2'] + shift2
-            min_dist_pairs_atoms.append((row['residue1'], row['residue2'],auth_res_id1, auth_res_id2, chain1_res1_structure[ind[0]].atom_name, chain2_res2_structure[ind[1]].atom_name))
+            min_dist_pairs_atoms.append((row['residue1'], row['residue2'], auth_res_id1, auth_res_id2, chain1_res1_structure[ind[0]].atom_name, chain2_res2_structure[ind[1]].atom_name))
         min_dist_pairs_atoms_arr = np.array(min_dist_pairs_atoms, dtype={'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']})
         return min_dist_pairs_atoms_arr
 
