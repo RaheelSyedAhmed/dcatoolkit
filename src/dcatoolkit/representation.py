@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from collections.abc import Iterable
 from scipy.spatial.distance import cdist
-
+import biotite.structure as struc
 import biotite.structure.io.pdbx as pdbx
 import biotite.database.rcsb as rcsb
 
@@ -424,9 +424,12 @@ class DirectInformationData:
         # Alternative approach is to just use get function instead of [x] and default to np.nan and drop nans row-wise.
         mapping_key_mask = (np.isin(DI_data['residue1'], list(RA1.domain_to_protein.keys()))) & (np.isin(DI_data['residue2'], list(RA2.domain_to_protein.keys())))
         mappable_DI_data = DI_data[mapping_key_mask]
-        mappable_DI_data['residue1'] = np.vectorize(lambda x: RA1.domain_to_protein[x])(mappable_DI_data['residue1'])
-        mappable_DI_data['residue2'] = np.vectorize(lambda x: RA2.domain_to_protein[x])(mappable_DI_data['residue2'])
-        return mappable_DI_data
+        if len(mappable_DI_data) == 0:
+            return mappable_DI_data
+        else:
+            mappable_DI_data['residue1'] = np.vectorize(lambda x: RA1.domain_to_protein[x])(mappable_DI_data['residue1'])
+            mappable_DI_data['residue2'] = np.vectorize(lambda x: RA2.domain_to_protein[x])(mappable_DI_data['residue2'])
+            return mappable_DI_data
     
     @staticmethod
     def rank_pairs(DI_data: npt.NDArray) -> npt.NDArray:
@@ -585,6 +588,10 @@ class StructureInformation:
 
     Attributes
     ----------
+    self.full_sequence : str
+        The full protein sequence from the pdbx file used to generate the structure.
+    self.non_missing_sequence : str
+        The protein sequence, without missing residues, compiled in the structure of the StructureInformation instance.
     self.atom_data : numpy.ndarray, optional
         Entries in the format 'ATOM', residue index, chain ID, auth residue index, auth chain ID, model number
     self.het_atom_data : numpy.ndarray, optional
@@ -600,6 +607,8 @@ class StructureInformation:
         self.structure = structure
         self.pdbx_file = pdbx_file
         self.model_num = model_num
+        self.full_sequence = str(pdbx.get_sequence(pdbx_file)[0])
+        self.non_missing_sequence = str(struc.to_sequence(structure[structure.hetero == False])[0][0])
         self.generate_auth_info()
 
     def generate_auth_info(self) -> None:
