@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
-from collections.abc import Iterable
 from scipy.spatial.distance import cdist
+
 import biotite.structure as struc
 import biotite.structure.io.pdbx as pdbx
 import biotite.database.rcsb as rcsb
 
-from typing import Optional
+from collections.abc import Iterable
+from typing import Optional, Union
 import numpy.typing as npt
 
 
@@ -44,6 +45,40 @@ class Pairs:
             self.pairs = ndarr
     
     @staticmethod
+    def load_from_file(filepath: str):
+        """
+        Loads file containing whitespace-delimited data in columns of residues being column 1 and column 2.
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath with residue columns corresponding to the indices of first and second components (proteins, chains, etc.) constituting a pair.
+
+        Returns
+        -------
+        Pairs
+            Pairs object with a loaded, structured ndarray with dtype=[('residue1', int), ('residue2', int)]
+        """
+        return Pairs(ndarr=np.loadtxt(filepath, dtype=[('residue1', int), ('residue2', int)]))
+
+    @staticmethod
+    def load_from_ndarray(ndarray: Union[npt.NDArray, Iterable[Iterable]]):
+        """
+        Loads 2d ndarray of residue pairs in columnar format into Pairs object.
+
+        Parameters
+        ----------
+        ndarray : numpy.ndarray or Iterable of Iterable (excluding dict)
+            Unstructured ndarray or iterable of iterables with pairs of residue indices with residue1 and residue 2 in separate columns or as two separate elements.
+
+        Returns
+        -------
+        Pairs
+            Pairs object with a loaded, structured ndarray with dtype=[('residue1', int), ('residue2', int)]
+        """
+        return Pairs(ndarr=np.array([tuple(x) for x in ndarray], dtype={'names': ('residue1', 'residue2'), 'formats': (int, int)}))
+    
+    @staticmethod
     def mirror_diagonal(pairs: npt.NDArray) -> npt.NDArray:
         """ 
         Flip 2D ndarray with 2 columns columnwise. Flips pair positions for diagonal-mirrored representation.
@@ -58,7 +93,10 @@ class Pairs:
         numpy.ndarray 
             Values flipped along the column axis.
         """
-        return np.flip(pairs, axis=1)
+        if pairs.dtype.names is not None:
+            return np.array([tuple(x)[::-1] for x in pairs], dtype={'names': ('residue1', 'residue2'), 'formats': (int, int)})
+        else:
+            return np.flip(pairs, axis=1)
     
     @staticmethod
     def subset_pairs(pairs: npt.NDArray, number : Optional[int]=None) -> npt.NDArray:
@@ -104,7 +142,12 @@ class Pairs:
             The original pairs specified from the parameters section.
         """
         if mirror:
-            return np.vstack((pairs, Pairs.mirror_diagonal(pairs)))
+            if pairs.dtype.names is not None:
+                unstruc_pairs = [tuple(x) for x in pairs]
+                unstruc_pairs_mirrored = [tuple(x)[::-1] for x in pairs]
+                return np.array(unstruc_pairs + unstruc_pairs_mirrored, dtype=[('residue1', int), ('residue2', int)])     
+            else:
+                return np.vstack((pairs, Pairs.mirror_diagonal(pairs)))
         else:
             return pairs
     
@@ -130,8 +173,6 @@ class Pairs:
         # Check to see if user requested mirrored pairs, if so, add in pairs that are mirrored across diagonal
         pairs = Pairs.subset_pairs(pairs, number)
         if mirror:
-            if pairs.dtype.names is not None:
-                pairs = np.array([[*pair] for pair in pairs])
             pairs = Pairs.mirror_pairs(pairs, mirror)
         return pairs
 
@@ -345,21 +386,22 @@ class DirectInformationData:
         return DirectInformationData(np.loadtxt(DI_filepath, dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)}))
 
     @staticmethod
-    def load_as_ndarray(ndarray: npt.NDArray) -> 'DirectInformationData':
+    def load_as_ndarray(ndarray: Union[npt.NDArray, Iterable[Iterable]]) -> 'DirectInformationData':
         """
         Function to generate a Direct Information object from a ndarray.
 
         Parameters
         ----------
-        ndarray : numpy.ndarray
-            An ndarray of shape (n,3) where its columns are (residue 1, residue 2, and Direct Information)
+        ndarray : numpy.ndarray or Iterable of Iterable (excluding dict)
+            An ndarray of shape (n,3) where its columns are (residue 1, residue 2, and Direct Information). Can also be parsed from an iterable of iterable provided that the aforementioned format is followed.
 
         Returns
         -------
         DirectInformationData
             DirectInformationData object with named structured array containing residue indices and the DI value of the pair.
         """
-        if ndarray.shape[1] != 3:
+        
+        if isinstance(ndarray, np.ndarray) and ndarray.shape[1] != 3:
             raise Exception("Dimensions of numpy array supplied are different from what is expected. Please supply residue1, residue2, and DI column in int, int, float format and with shape of (n, 3).")
         # Structured ndarrays require list of tuples for conversion.
         DI_data = np.array([tuple(x) for x in ndarray], dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)})
@@ -783,8 +825,8 @@ class StructureInformation:
         shift1 = 0
         shift2 = 0
         if self.atom_site_category:
-            shift1 = abs(self.res_auth_dict[chain1][0] - self.res_auth_dict[chain1][1])
-            shift2 = abs(self.res_auth_dict[chain2][0] - self.res_auth_dict[chain2][1])
+            shift1 = self.res_auth_dict[chain1][1] - self.res_auth_dict[chain1][0]
+            shift2 = self.res_auth_dict[chain2][1] - self.res_auth_dict[chain2][0]
             return shift1, shift2
         else:
             return shift1, shift2
