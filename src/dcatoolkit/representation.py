@@ -630,10 +630,10 @@ class StructureInformation:
 
     Attributes
     ----------
-    self.full_sequence : str
-        The full protein sequence from the pdbx file used to generate the structure.
-    self.non_missing_sequence : str
-        The protein sequence, without missing residues, compiled in the structure of the StructureInformation instance.
+    self.full_sequences : dict of str, biotite.sequence.ProteinSequence
+        The full protein sequences from the pdbx file used to generate the structure stored in a dictionary where auth_chain_id is the key and the ProteinSequence object is the value.
+    self.non_missing_sequences : dict of str, biotite.sequence.ProteinSequence
+        The protein sequences, without missing residues, compiled in the structure of the StructureInformation instance stored in a dictionary where chain_id is the key and the sequence string is the value.
     self.atom_data : numpy.ndarray, optional
         Entries in the format 'ATOM', residue index, chain ID, auth residue index, auth chain ID, model number
     self.het_atom_data : numpy.ndarray, optional
@@ -649,8 +649,9 @@ class StructureInformation:
         self.structure = structure
         self.pdbx_file = pdbx_file
         self.model_num = model_num
-        self.full_sequence = str(pdbx.get_sequence(pdbx_file)[0])
-        self.non_missing_sequence = str(struc.to_sequence(structure[structure.hetero == False])[0][0])
+        self.full_sequences = pdbx.get_sequence(pdbx_file)
+        non_hetero_structure = self.structure[self.structure.hetero == False]
+        self.non_missing_sequences = {str(chain): str(sequence) for (chain, sequence) in list(zip(struc.get_chains(non_hetero_structure), struc.to_sequence(non_hetero_structure)[0]))}
         self.generate_auth_info()
 
     def generate_auth_info(self) -> None:
@@ -753,6 +754,55 @@ class StructureInformation:
         pdbx_file = pdbx.CIFFile.read(pdb_filepath)
         return StructureInformation(pdbx.get_structure(pdbx_file, model=model_num, use_author_fields=False), pdbx_file, model_num)
     
+    def get_full_sequence(self, chain_id: str, auth_chain_id_supplied: bool=False) -> str:
+        """
+        Get full sequence, including missing residues, from the specified chain off of RCSB.
+
+        Parameters
+        ----------
+        chain_id : str
+            Chain id supplied. The full sequence, including missing residues, of this chain will be returned.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+
+        Returns
+        -------
+        str
+            The full sequence, including missing residues, of the chain specified.
+        """
+        if auth_chain_id_supplied:
+            return str(self.full_sequences[chain_id])
+        else:
+            return str(self.full_sequences[self.chain_auth_dict[chain_id]])
+        
+    
+    def get_non_missing_sequence(self, chain_id: str, auth_chain_id_supplied: bool=False) -> str:
+        """
+        Get sequence, including only non-missing residues, from the specified chain off of RCSB.
+
+        Parameters
+        ----------
+        chain_id : str
+            Chain id supplied. The full sequence, including only non-missing residues, of this chain will be returned.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+
+        Returns
+        -------
+        str
+            The full sequence, including only non-missing residues, of the chain specified.
+        """
+        if auth_chain_id_supplied:
+            original_chain_id = None
+            for key in self.chain_auth_dict.keys():
+                if self.chain_auth_dict[key] == chain_id:
+                    original_chain_id = key
+            if original_chain_id is None:
+                raise Exception("Auth chain id supplied not found in chain_auth_dict.")
+            else:
+                return self.non_missing_sequences[original_chain_id]
+        return self.non_missing_sequences[chain_id]
+        
     def get_chain_specific_structure(self, ca_only: bool, chain1: str, chain2: str, remove_hetero=True) -> tuple:
         """
         Subsets structure attribute to select for chain specific portions of the structure.
