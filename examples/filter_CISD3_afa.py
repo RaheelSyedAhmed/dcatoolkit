@@ -10,7 +10,7 @@ CISD3_filtered_MSA.write("examples/outputs/CISD3_filtered_35_MSA.fasta")
 """
 
 struc_6avj = StructureInformation.fetch_pdb("6AVJ")
-print(struc_6avj.full_sequence)
+print(struc_6avj.get_full_sequence('A'))
 print(struc_6avj.get_shift_values('A', 'A'))
 
 loaded_pairs = Pairs.load_from_ndarray([(1,2), (3,10)])
