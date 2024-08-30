@@ -1,7 +1,7 @@
 import re
 from collections import Counter
-from typing import Optional
-import string
+from typing import Optional, Union
+import string, io
 
 class MSATools:
     """
@@ -16,23 +16,31 @@ class MSATools:
         self.MSA = MSA
     
     @staticmethod
-    def load_from_file(msa_filepath: str) -> 'MSATools':
+    def load_from_file(msa_source: Union[str, io.IOBase]) -> 'MSATools':
         """
         Generates MSATools object from an MSA file in ".afa" format.
 
         Parameters
         ----------
-        msa_filepath : str
-            Filepath of the MSA in ".afa" format that is provided.
+        msa_source : str or io.IOBase
+            Filepath or IOBase of the MSA in ".afa" format that is provided.
         
         Returns
         -------
         MSATools
             An MSATools instance with the appropriate list of (header, sequence) tuples where sequences are simplified and converted to single line format.
         """
+        data = ""
         msa_entries: list[tuple[str, str]] = []
-        with open(msa_filepath, 'r') as fs:
-            data = fs.read()
+        if isinstance(msa_source, str):
+            with open(msa_source, 'r') as fs:
+                data = fs.read()
+        elif isinstance(msa_source, io.BytesIO):
+            data = msa_source.getvalue().decode()
+        elif isinstance(msa_source, io.StringIO):
+            data = msa_source.getvalue()
+        else:
+            raise Exception("msa_file is not bytesIO, stringIO, or a filepath.")
         split_data = data.split(">")[1:]
         for entry in split_data:
             line_split_entry = entry.split("\n")
@@ -113,25 +121,32 @@ class MSATools:
                     kept_entries.append((header, sequence))
         return kept_entries
 
-    def write(self, filepath: str) -> None:
+    def write(self, destination: Union[str, io.IOBase]) -> None:
         """
-        Writes this MSA's headers and sequences to the filepath specified.
+        Writes this MSA's headers and sequences to the destination specified.
         
         Parameters
         ----------
-        filepath : str
-            Filepath to write the MSA supplied to.
+        destination : str or io.IOBase
+            Filepath or IO to write the MSA supplied to.
 
         Returns
         -------
         None
         """
-        with open(filepath, 'w') as fs:
+        if isinstance(destination, str):
+            with open(destination, 'w') as fs:
+                for header, sequence in self.MSA:
+                    fs.write(header)
+                    fs.write("\n")
+                    fs.write(sequence)
+                    fs.write("\n")
+        elif isinstance(destination, io.IOBase):
             for header, sequence in self.MSA:
-                fs.write(header)
-                fs.write("\n")
-                fs.write(sequence)
-                fs.write("\n")
+                destination.write(header)
+                destination.write("\n")
+                destination.write(sequence)
+                destination.write("\n")
 
     def __len__(self):
         """
