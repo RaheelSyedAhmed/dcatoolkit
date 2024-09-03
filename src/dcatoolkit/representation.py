@@ -641,7 +641,9 @@ class StructureInformation:
     self.unique_chains : numpy.ndarray, optional
         Array of unique asym_id entries which corresponds to unique chain IDs.
     self.chain_auth_dict : dict of str, str, optional
-        Uses chain id as a key and provides auth chain id as a value. 
+        Uses chain id as a key and provides auth chain id as a value.
+    self.auth_chain_dict : dict of str, str, optional
+        Uses auth chain id as a key and provides original/label chain id as a value. 
     self.res_auth_dict : dict of str, tuple of int, int or optional 
         Uses chain id as a key and an array of residue index and auth residue index as a value.
     """
@@ -670,6 +672,7 @@ class StructureInformation:
             self.first_block = list(self.pdbx_file)[0]
             self.atom_site_category = self.pdbx_file[self.first_block].get('atom_site')
             self.chain_auth_dict = {}
+            self.auth_chain_dict = {}
             self.res_auth_dict = {}
             if self.atom_site_category:
                 group_pdbs = []
@@ -700,6 +703,7 @@ class StructureInformation:
                 for unique_chain in self.unique_chains:
                     unique_entry = self.atom_data[self.atom_data[:,2] == unique_chain][0]
                     self.chain_auth_dict[unique_entry[2]] = unique_entry[4]
+                    self.auth_chain_dict[unique_entry[4]] = unique_entry[2]
                     self.res_auth_dict[unique_entry[2]] = unique_entry[[1,3]].astype('int')
         else:
             self.atom_site_category = None
@@ -775,7 +779,6 @@ class StructureInformation:
         else:
             return str(self.full_sequences[self.chain_auth_dict[chain_id]])
         
-    
     def get_non_missing_sequence(self, chain_id: str, auth_chain_id_supplied: bool=False) -> str:
         """
         Get sequence, including only non-missing residues, from the specified chain off of RCSB.
@@ -793,15 +796,10 @@ class StructureInformation:
             The full sequence, including only non-missing residues, of the chain specified.
         """
         if auth_chain_id_supplied:
-            original_chain_id = None
-            for key in self.chain_auth_dict.keys():
-                if self.chain_auth_dict[key] == chain_id:
-                    original_chain_id = key
-            if original_chain_id is None:
-                raise Exception("Auth chain id supplied not found in chain_auth_dict.")
-            else:
-                return self.non_missing_sequences[original_chain_id]
-        return self.non_missing_sequences[chain_id]
+            original_chain_id = self.auth_chain_dict[chain_id]
+            return self.non_missing_sequences[original_chain_id]
+        else:
+            return self.non_missing_sequences[chain_id]
         
     def get_chain_specific_structure(self, ca_only: bool, chain1: str, chain2: str, remove_hetero=True) -> tuple:
         """
