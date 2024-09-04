@@ -801,7 +801,7 @@ class StructureInformation:
         else:
             return self.non_missing_sequences[chain_id]
         
-    def get_chain_specific_structure(self, ca_only: bool, chain1: str, chain2: str, remove_hetero=True) -> tuple:
+    def get_chain_specific_structure(self, ca_only: bool, chain1: str, chain2: str, remove_hetero=True, auth_chain_id_supplied: bool=False) -> tuple:
         """
         Subsets structure attribute to select for chain specific portions of the structure.
 
@@ -815,12 +815,18 @@ class StructureInformation:
             Chain id corresponding to the second column of residues in the structure.
         remove_hetero : bool, default=True
             If true, the structure will also be subsetted for atom entries where the hetero annotation is False, thus removing heteroatoms.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
 
         Returns
         -------
         tuple of biotite.structure.AtomArray, biotite.structure.AtomArray
             Two AtomArrays that refer to atoms in the first chain and second chain, respectively without accounting for the presence of heteroatoms if `remove_hetero` is True.
         """
+        if auth_chain_id_supplied:
+            chain1 = self.auth_chain_dict[chain1]
+            chain2 = self.auth_chain_dict[chain2]
+
         selected_structure = self.structure
         if remove_hetero:
             # Remove hetero atoms via hetero column of structure ndarray
@@ -832,7 +838,7 @@ class StructureInformation:
         chain2_structure = selected_structure[selected_structure.chain_id == chain2]
         return (chain1_structure, chain2_structure)
 
-    def generate_dist_matrix(self, ca_only: bool, chain1: str, chain2: str):
+    def generate_dist_matrix(self, ca_only: bool, chain1: str, chain2: str, auth_chain_id_supplied: bool=False):
         """
         Generates distance matrix between two chains in the structure attribute.
 
@@ -844,17 +850,19 @@ class StructureInformation:
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
             Chain id corresponding to the first column of residues in the structure.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
 
         Returns
         -------
         tuple of biotite.structure.AtomArray, biotite.structure.AtomArray, numpy.ndarray
             Tuple containing the chain 1 structure, the chain 2 structure, and the distance matrix of chain 1 and chain 2's pairwise distances.
         """
-        chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only, chain1, chain2, remove_hetero=True)
+        chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only, chain1, chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
         dist_matrix = cdist(chain1_structure.coord, chain2_structure.coord)
         return (chain1_structure, chain2_structure, dist_matrix)
     
-    def get_shift_values(self, chain1: str, chain2: str) -> tuple[int, int]:
+    def get_shift_values(self, chain1: str, chain2: str, auth_chain_id_supplied: bool=False) -> tuple[int, int]:
         """
         Get shift values needed for production of auth residue ids.
         
@@ -864,12 +872,18 @@ class StructureInformation:
             Name of the chain id present in the struct_ref_seq block of cif files referring to the second column of residues.
         chain2 : str
             Name of the chain id present in the struct_ref_seq block of cif files referring to the second column of residues.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
 
         Returns
         -------
         (shift1, shift2) : tuple of int, int
             Tuple containing both shift values, the difference between the auth_res_id and res_id.
         """
+        if auth_chain_id_supplied:
+            chain1 = self.auth_chain_dict[chain1]
+            chain2 = self.auth_chain_dict[chain2]
+
         shift1 = 0
         shift2 = 0
         if self.atom_site_category:
@@ -879,7 +893,7 @@ class StructureInformation:
         else:
             return shift1, shift2
 
-    def get_min_dist_atom_info(self, pairs: npt.NDArray, chain1: str, chain2: str) -> npt.NDArray:
+    def get_min_dist_atom_info(self, pairs: npt.NDArray, chain1: str, chain2: str, auth_chain_id_supplied: bool=False) -> npt.NDArray:
         """
         Generate a ndarray of residue ids and their corresponding atom names such that the distance is the minimum between the initial residues provided.
 
@@ -891,14 +905,16 @@ class StructureInformation:
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
             Chain id corresponding to the second column of residues in the structure.
-
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+            
         Returns
         -------
         min_dist_pairs_atoms_arr : numpy.ndarray
             Structured ndarray that has residue indices, auth residue indices (corresponding to the protein numbering), and atomic names in the format {'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,str,str]}
         """
-        shift1, shift2 = self.get_shift_values(chain1, chain2)
-        chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only=False, chain1=chain1, chain2=chain2, remove_hetero=True)
+        shift1, shift2 = self.get_shift_values(chain1, chain2, auth_chain_id_supplied=auth_chain_id_supplied)
+        chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only=False, chain1=chain1, chain2=chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
         min_dist_pairs_atoms = []
         for row in pairs:
             # Obtain structure information for chains 1 and 2
@@ -917,7 +933,7 @@ class StructureInformation:
         min_dist_pairs_atoms_arr = np.array(min_dist_pairs_atoms, dtype={'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']})
         return min_dist_pairs_atoms_arr
 
-    def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str, auth_contacts: bool=False) -> set[tuple[int, int]]:
+    def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str, auth_contacts: bool=False, auth_chain_id_supplied: bool=False) -> set[tuple[int, int]]:
         """
         Get contacts from the structure attribute where the distance between two residues is less than the threshold.
 
@@ -932,15 +948,17 @@ class StructureInformation:
         chain2 : str
             Chain id corresponding to the second column of residues in the structure.
         auth_contacts : bool
-            True if supplying alt_ids for residues indices, False if cif residue indexing is needed.
+            True if you want alt_ids for residues indices, False if cif residue indexing is needed.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
 
         Returns
         -------
         contacts_set : set of tuple of ints
             Set of contacts, tuples with "residue1" and "residue2" from the structure that are within the distance threshold.
         """
-        shift1, shift2 = self.get_shift_values(chain1, chain2)
-        chain1_structure, chain2_structure, dist_matrix = self.generate_dist_matrix(ca_only, chain1, chain2)
+        
+        chain1_structure, chain2_structure, dist_matrix = self.generate_dist_matrix(ca_only, chain1, chain2, auth_chain_id_supplied=auth_chain_id_supplied)
         thresh_ind = np.argwhere(dist_matrix <= threshold)
         contacts_set = set()
         for indices in thresh_ind:
@@ -950,6 +968,7 @@ class StructureInformation:
             res2 = chain2_atom.res_id
             if not(chain1==chain2 and res1 >= res2):
                 if auth_contacts:
+                    shift1, shift2 = self.get_shift_values(chain1, chain2, auth_chain_id_supplied=auth_chain_id_supplied)
                     contacts_set.add((res1 + shift1, res2 + shift2))
                 else:
                     contacts_set.add((res1, res2))
