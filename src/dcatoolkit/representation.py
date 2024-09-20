@@ -1186,9 +1186,9 @@ class PDBInformation(StructureInformation):
             ind = np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
             # Use the indices to access the atom in the atom array and get the correct atom name.
             # Generate the auth ids of the residues in the pairs ndarray
-            auth_res_id1 = row['residue1'] + shift1
-            auth_res_id2 = row['residue2'] + shift2
-            min_dist_pairs_atoms.append((row['residue1'], row['residue2'], auth_res_id1, auth_res_id2, chain1_res1_structure[ind[0]].atom_name, chain2_res2_structure[ind[1]].atom_name))
+            orig_res_id1 = row['residue1'] - shift1
+            orig_res_id2 = row['residue2'] - shift2
+            min_dist_pairs_atoms.append((orig_res_id1, orig_res_id2, row['residue1'], row['residue2'], chain1_res1_structure[ind[0]].atom_name, chain2_res2_structure[ind[1]].atom_name))
         min_dist_pairs_atoms_arr = np.array(min_dist_pairs_atoms, dtype={'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']})
         return min_dist_pairs_atoms_arr    
 
@@ -1224,9 +1224,9 @@ class PDBInformation(StructureInformation):
             res1 = chain1_atom.res_id
             res2 = chain2_atom.res_id
             if not(chain1==chain2 and res1 >= res2):
-                if auth_contacts:
+                if not auth_contacts:
                     shift1, shift2 = self.get_shift_values(chain1, chain2)
-                    contacts_set.add((res1 + shift1, res2 + shift2))
+                    contacts_set.add((res1 - shift1, res2 - shift2))
                 else:
                     contacts_set.add((res1, res2))
         return contacts_set
