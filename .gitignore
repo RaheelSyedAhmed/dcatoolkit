@@ -4,3 +4,4 @@
 /src/dcatoolkit.egg-info
 /dist
 /examples/__pycache__
+/.venv
