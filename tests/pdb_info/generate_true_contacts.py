@@ -1,6 +1,4 @@
-from pathlib import Path
 import subprocess
-import shlex
 
 threshold_AA = float(8)
 threshold_CA = float(10)
