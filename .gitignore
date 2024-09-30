@@ -5,3 +5,4 @@
 /dist
 /examples/__pycache__
 /.venv
+/tests/__pycache__
