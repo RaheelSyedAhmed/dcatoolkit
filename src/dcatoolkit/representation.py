@@ -8,7 +8,7 @@ import biotite.structure.io.pdb as pdb
 import biotite.database.rcsb as rcsb
 
 from collections.abc import Iterable
-from typing import Optional, Union
+from typing import Optional, Union, Literal, overload
 import numpy.typing as npt
 
 
@@ -620,12 +620,21 @@ class StructureInformation:
     """
     Information regarding a protein structure, obtained from a protein structure file.
 
-    
+    Uses fetch_pdb() to pull protein structure information from RCSB. Uses read_x_file() to supply a filepath to pull protein structure information from a file.
     """
+    @overload
+    @staticmethod
+    def fetch_pdb(pdb_id: str, struc_format: Literal["mmcif"]="mmcif", model_num: int=1) -> 'MMCIFInformation':
+        ...
+
+    @overload
+    @staticmethod
+    def fetch_pdb(pdb_id: str, struc_format: Literal["pdb"], model_num: int=1) -> 'PDBInformation':
+        ...
 
 
     @staticmethod
-    def fetch_pdb(pdb_id: str, model_num: int=1, struc_format: str="mmcif") -> Union['MMCIFInformation', 'PDBInformation']:
+    def fetch_pdb(pdb_id: str, struc_format: Literal["mmcif", "pdb"]="mmcif", model_num: int=1) -> Union['MMCIFInformation', 'PDBInformation']:
         """
         Fetches PDB as mmCIF file from RCSB and compiles the information into a StructureInformation instance.
 
@@ -633,11 +642,11 @@ class StructureInformation:
         ----------
         pdb_id : str
             PDB ID to be fetched from the RCSB database.
-        model_num : int
-            The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
         struc_format : str
             The format of the file to pull from the RCSB database.
-        
+        model_num : int
+            The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
+            
         Returns
         -------
         StructureInformation
