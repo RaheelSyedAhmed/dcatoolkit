@@ -1,7 +1,6 @@
 
-from src.dcatoolkit.analytics import MSATools
-from src.dcatoolkit.representation import DirectInformationData, StructureInformation, Pairs, ResidueAlignment
-import numpy as np
+from context import MSATools
+from context import StructureInformation, Pairs
 
 
 CISD3_MSA = MSATools.load_from_file("examples/files/output_MSA_CISD3")

@@ -1,5 +1,5 @@
 import numpy as np
-from src.dcatoolkit.representation import DirectInformationData, StructureInformation
+from context import DirectInformationData, StructureInformation
 
 # Pulling a CISD3 protein structure and supplying an ndarray of indices and values to serve as a DI ndarray.
 s = StructureInformation.fetch_pdb("6AVJ")

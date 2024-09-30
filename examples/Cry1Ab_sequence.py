@@ -1,4 +1,4 @@
-from src.dcatoolkit.representation import DirectInformationData, StructureInformation, ResidueAlignment
+from context import StructureInformation
 
 
 struc_6dj4 = StructureInformation.fetch_pdb("6DJ4")

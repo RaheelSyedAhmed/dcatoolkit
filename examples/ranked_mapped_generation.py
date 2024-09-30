@@ -1,5 +1,4 @@
-from src.dcatoolkit.representation import DirectInformationData, ResidueAlignment
-import numpy as np
+from context import DirectInformationData, ResidueAlignment
 
 # Testing of DirectInformationData loading from two separate files.
 beta_trefoil_IDID = DirectInformationData.load_from_dca_output("examples/files/Beta_Trefoil_MSA_1.info")

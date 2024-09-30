@@ -1,14 +1,11 @@
-import numpy as np
-import numpy.typing as npt
-from collections.abc import Iterable
-from src.dcatoolkit.representation import DirectInformationData, StructureInformation, ResidueAlignment
+from context import DirectInformationData, StructureInformation, ResidueAlignment
 
 # Reading in top 5 scoring AlphaFold3 models produced.
-btr1_complex_0 = StructureInformation.read_pdb_mmCIF("examples/files/fold_cry1ab_ec12_model_0.cif")
-btr1_complex_1 = StructureInformation.read_pdb_mmCIF("examples/files/fold_cry1ab_ec12_model_1.cif")
-btr1_complex_2 = StructureInformation.read_pdb_mmCIF("examples/files/fold_cry1ab_ec12_model_2.cif")
-btr1_complex_3 = StructureInformation.read_pdb_mmCIF("examples/files/fold_cry1ab_ec12_model_3.cif")
-btr1_complex_4 = StructureInformation.read_pdb_mmCIF("examples/files/fold_cry1ab_ec12_model_4.cif")
+btr1_complex_0 = StructureInformation.read_mmCIF_file("examples/files/fold_cry1ab_ec12_model_0.cif")
+btr1_complex_1 = StructureInformation.read_mmCIF_file("examples/files/fold_cry1ab_ec12_model_1.cif")
+btr1_complex_2 = StructureInformation.read_mmCIF_file("examples/files/fold_cry1ab_ec12_model_2.cif")
+btr1_complex_3 = StructureInformation.read_mmCIF_file("examples/files/fold_cry1ab_ec12_model_3.cif")
+btr1_complex_4 = StructureInformation.read_mmCIF_file("examples/files/fold_cry1ab_ec12_model_4.cif")
 
 # Getting contacts between proteins A and B
 contacts_0 = btr1_complex_0.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_contacts=True)

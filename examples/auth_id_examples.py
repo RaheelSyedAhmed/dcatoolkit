@@ -1,4 +1,4 @@
-from src.dcatoolkit.representation import DirectInformationData, StructureInformation
+from context import StructureInformation
 
 struc_1hqz = StructureInformation.fetch_pdb("1hqz")
 print(struc_1hqz.res_auth_dict)

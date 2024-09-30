@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from src.dcatoolkit.representation import DirectInformationData, StructureInformation
+from context import StructureInformation
 
 # Fetching the CISD3 protein structure from RCSB and getting the all-atom contacts within 8 Angstrom of each other
 s = StructureInformation.fetch_pdb("6AVJ")
