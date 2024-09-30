@@ -1,7 +1,8 @@
 import re
 from collections import Counter
 from typing import Optional, Union
-import string, io
+import string
+import io
 
 class MSATools:
     """
@@ -107,7 +108,7 @@ class MSATools:
             List of entries that are valid in that their sequences' number of maximum continuous gaps is within the threshold supplied as `max_gaps`. 
         """
         table = str.maketrans('', '', string.ascii_lowercase+".")
-        if max_gaps == None:
+        if max_gaps is None:
             kept_entries = []
             for header, sequence in self.MSA:
                 sequence = sequence.translate(table)
