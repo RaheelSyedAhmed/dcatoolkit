@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dcatoolkit"
-version = "0.1.9"
+version = "0.2.0"
 description = "Collection of useful modules and representations for managing DCA output data."
 keywords = ["dca", "toolkit", "DI", "coevolution"]
 
@@ -21,7 +21,7 @@ maintainers = [
 ]
 
 dependencies = [
-  "biotite",
+  "biotite>=1.0.1",
   "matplotlib>=3.8.0",
   "numpy>=1.26.0",
   "pandas>=2.1.0",
