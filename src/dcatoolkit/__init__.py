@@ -1,5 +1,5 @@
 
-__version__ = "0.1.9"
+__version__ = "0.2.1"
 from .representation import Pairs, DirectInformationData, StructureInformation, ResidueAlignment, MMCIFInformation, PDBInformation
 from .analytics import MSATools
 
