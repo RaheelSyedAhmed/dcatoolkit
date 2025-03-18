@@ -59,9 +59,9 @@ def check_contacts(test_CA: bool, threshold: float):
         
         cif_file_contacts = read_contacts(corresponding_file)
         chain1, auth_chain1, chain2, auth_chain2 = pdb_id_chain_map[pdb_id]
-        fetch_cif_contacts = {(int(x[0]), int(x[1])) for x in MMCIFInformation.fetch_pdb(pdb_id).get_contacts(test_CA, threshold, chain1, chain2, auth_contacts=True)}
+        fetch_cif_contacts = {(int(x[0]), int(x[1])) for x in MMCIFInformation.fetch_pdb(pdb_id, 'mmcif').get_contacts(test_CA, threshold, chain1, chain2, auth_contacts=True)}
         read_cif_contacts = {(int(x[0]), int(x[1])) for x in MMCIFInformation.read_mmCIF_file(str(cif_file)).get_contacts(test_CA, threshold, chain1, chain2, auth_contacts=True)}
-        fetch_authchain_cif_contacts = {(int(x[0]), int(x[1])) for x in MMCIFInformation.fetch_pdb(pdb_id).get_contacts(test_CA, threshold, auth_chain1, auth_chain2, auth_contacts=True, auth_chain_id_supplied=True)}
+        fetch_authchain_cif_contacts = {(int(x[0]), int(x[1])) for x in MMCIFInformation.fetch_pdb(pdb_id, 'mmcif').get_contacts(test_CA, threshold, auth_chain1, auth_chain2, auth_contacts=True, auth_chain_id_supplied=True)}
         read_authchain_cif_contacts = {(int(x[0]), int(x[1])) for x in MMCIFInformation.read_mmCIF_file(str(cif_file)).get_contacts(test_CA, threshold, auth_chain1, auth_chain2, auth_contacts=True, auth_chain_id_supplied=True)}
         fetch_pdb_contacts = {(int(x[0]), int(x[1])) for x in PDBInformation.fetch_pdb(pdb_id, struc_format="pdb").get_contacts(test_CA, threshold, auth_chain1, auth_chain2, auth_contacts=True)}
         read_pdb_contacts = {(int(x[0]), int(x[1])) for x in PDBInformation.read_pdb_file(f"tests/pdb_info/{pdb_id.lower()}.pdb").get_contacts(test_CA, threshold, auth_chain1, auth_chain2, auth_contacts=True)}
