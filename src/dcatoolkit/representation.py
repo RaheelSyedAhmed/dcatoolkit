@@ -546,7 +546,7 @@ class DirectInformationData:
         return results
 
     @staticmethod
-    def get_dist_commands(model1: str | int, model2: str | int, chain1: str, chain2: str, pairs: npt.NDArray, ca_only: bool=True, auth_res_ids=False) -> list[str]:
+    def get_dist_commands(model1: str | int, model2: str | int, chain1: str, chain2: str, pairs: npt.NDArray, ca_only: bool=True, auth_res_ids: bool=False) -> list[str]:
         """
         Get UCSF Chimera commands for displaying distance commands for usage in displaying distances between residue pairs. Options are present for alpha-carbon to alpha-carbon distance or for specified atom to specified atom distance.
         
@@ -787,32 +787,15 @@ class MMCIFInformation(StructureInformation):
         if len(self.pdbx_file.keys()) > 0:
             self.first_block = list(self.pdbx_file)[0]
             self.atom_site_category = self.pdbx_file[self.first_block].get('atom_site')
-            self.chain_auth_dict = {}
-            self.auth_chain_dict = {}
-            self.res_auth_dict = {}
+            self.chain_auth_dict: dict[str, str] = {}
+            self.auth_chain_dict: dict[str, str] = {}
+            self.res_auth_dict: dict[str, tuple[int, int]] = {}
+            
             if self.atom_site_category:
-                group_pdbs = []
-                seq_ids = []
-                asym_ids = []
-                auth_seq_ids = []
-                auth_asym_ids = []
-                model_nums = []
-                for col_name, col in self.atom_site_category.items():
-                    if col_name == 'group_PDB':
-                        group_pdbs = col.as_array()
-                    elif col_name == 'label_seq_id':
-                        seq_ids = col.as_array()
-                    elif col_name == 'label_asym_id':
-                        asym_ids = col.as_array()
-                    elif col_name == 'auth_seq_id':
-                        auth_seq_ids = col.as_array()
-                    elif col_name == 'auth_asym_id':
-                        auth_asym_ids = col.as_array()
-                    elif col_name == 'pdbx_PDB_model_num':
-                        model_nums = col.as_array()
-
-                atom_site_data = np.unique(np.column_stack((group_pdbs, seq_ids, asym_ids, auth_seq_ids, auth_asym_ids, model_nums)), axis=0)
-                atom_site_data = atom_site_data[atom_site_data[:,5] == str(self.model_num)]
+                categories = ['group_PDB', 'label_seq_id', 'label_asym_id', 'auth_seq_id', 'auth_asym_id', 'pdbx_PDB_model_num']
+                atom_site_data = np.column_stack([self.atom_site_category[category].as_array() for category in categories])
+                _, idx = np.unique(atom_site_data, axis=0, return_index=True)
+                atom_site_data = atom_site_data[np.sort(idx)]
                 self.atom_data = atom_site_data[atom_site_data[:,0] == "ATOM"]
                 self.het_atom_data = atom_site_data[atom_site_data[:,0] == "HETATM"]
                 self.unique_chains = np.unique(self.atom_data[:,2])
@@ -824,6 +807,31 @@ class MMCIFInformation(StructureInformation):
         else:
             self.atom_site_category = None
     
+    def get_start_res_id(self, chain_id: str, auth_res_ids: bool=False, auth_chain_id_supplied: bool=False) -> int:
+        """
+        Gets starting residue id of the specified chain excluding heteroatom group entries.
+
+        Parameters
+        ----------
+        chain_id : str
+            The chain id supplied and selected for from the structure.
+        auth_res_ids : bool
+            True if you want alt_ids for residues indices, False if cif residue indexing is needed.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.            
+
+        Returns
+        -------
+        int
+            The residue id of the first atom in the chain provided.
+        """
+        if auth_chain_id_supplied:
+            chain_id = self.auth_chain_dict[chain_id]
+        if auth_res_ids:
+            return self.res_auth_dict[chain_id][1]
+        else:
+            return self.res_auth_dict[chain_id][0]
+
     def get_full_sequence(self, chain_id: str, auth_chain_id_supplied: bool=False) -> str:
         """
         Get full sequence, including missing residues, from the specified chain off of RCSB.
@@ -1066,6 +1074,26 @@ class PDBInformation(StructureInformation):
         non_hetero_structure = self.structure[self.structure.hetero == False]
         self.non_missing_sequences = {str(chain): str(sequence) for (chain, sequence) in list(zip(struc.get_chains(non_hetero_structure), struc.to_sequence(non_hetero_structure)[0]))}
         self.unique_chains = struc.get_chains(non_hetero_structure)
+
+    def get_start_res_id(self, chain_id: str) -> int:
+        """
+        Gets starting residue id of the specified chain excluding heteroatom group entries.
+
+        Parameters
+        ----------
+        chain_id : str
+            The chain id supplied and selected for from the structure.
+
+        Returns
+        -------
+        int
+            The residue id of the first atom in the chain provided.
+        """
+        non_hetero_structure = self.structure[self.structure.hetero == False]
+        if chain_id in self.unique_chains:
+            return non_hetero_structure[non_hetero_structure.chain_id == chain_id][0].res_id
+        else:
+            raise ValueError("Chain supplied not found in structure.")
 
     def get_non_missing_sequence(self, chain_id: str) -> str:
         """
