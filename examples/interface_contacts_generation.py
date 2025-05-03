@@ -1,9 +1,9 @@
 from context import StructureInformation
 
 # Fetching IL33 protein and getting alpha-carbon contacts and all-atom contacts
-struc_2kll = StructureInformation.fetch_pdb("2kll")
-ca_2kll_contacts = struc_2kll.get_contacts(ca_only=True, threshold=10, chain1='A', chain2='A', auth_contacts=True)
-aa_2kll_contacts = struc_2kll.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='A', auth_contacts=True)
+struc_2kll = StructureInformation.fetch_pdb("2kll", 'mmcif')
+ca_2kll_contacts = struc_2kll.get_contacts(ca_only=True, threshold=10, chain1='A', chain2='A', auth_seq_id=True)
+aa_2kll_contacts = struc_2kll.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='A', auth_seq_id=True)
 #print(ca_2kll_contacts)
 #print(aa_2kll_contacts)
 

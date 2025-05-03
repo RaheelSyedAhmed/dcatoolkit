@@ -1,0 +1,53 @@
+# hmmscan :: search sequence(s) against a profile database
+# HMMER 3.3.2 (Nov 2020); http://hmmer.org/
+# Copyright (C) 2020 Howard Hughes Medical Institute.
+# Freely distributed under the BSD open source license.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# query sequence file:             3d7i_protein_seq.fa
+# target HMM database:             3d7i_hmm
+# output directed to file:         3d7i_scan
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Query:       3D7I_1|Chains  [L=105]
+Description: A, B, C|carboxymuconolactone decarboxylase family protein|Methanocaldococcus jannaschii (2190)
+Scores for complete sequence (score includes all domains):
+   --- full sequence ---   --- best 1 domain ---    -#dom-
+    E-value  score  bias    E-value  score  bias    exp  N  Model     Description
+    ------- ------ -----    ------- ------ -----   ---- --  --------  -----------
+    1.4e-71  223.4   3.4    1.6e-71  223.3   3.4    1.0  1  3d7i_seed  
+
+
+Domain annotation for each model (and alignments):
+>> 3d7i_seed  
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !  223.3   3.4   1.6e-71   1.6e-71       1     104 []       2     105 .]       2     105 .] 1.00
+
+  Alignments for each domain:
+  == domain 1  score: 223.3 bits;  conditional E-value: 1.6e-71
+      3d7i_seed   1 mknevffgegmkvvkekypdlydiivklndtvftgktldyktqkliaigivasrcdevaiekqmksamkelgitkeeiadvlrvvlltsgmpaftk 96 
+                    mknevffgegmkvv   ypdlydiivklndtvftgktldyktqkliaigivasrcdevaiekqmksamkelgitkeeiadvlrvvlltsgmpaftk
+  3D7I_1|Chains   2 MKNEVFFGEGMKVVAAAYPDLYDIIVKLNDTVFTGKTLDYKTQKLIAIGIVASRCDEVAIEKQMKSAMKELGITKEEIADVLRVVLLTSGMPAFTK 97 
+                    9*********************************************************************************************** PP
+
+      3d7i_seed  97 amkilekl 104
+                    amkilekl
+  3D7I_1|Chains  98 AMKILEKL 105
+                    ******98 PP
+
+
+
+Internal pipeline statistics summary:
+-------------------------------------
+Query sequence(s):                         1  (105 residues searched)
+Target model(s):                           1  (104 nodes)
+Passed MSV filter:                         1  (1); expected 0.0 (0.02)
+Passed bias filter:                        1  (1); expected 0.0 (0.02)
+Passed Vit filter:                         1  (1); expected 0.0 (0.001)
+Passed Fwd filter:                         1  (1); expected 0.0 (1e-05)
+Initial search space (Z):                  1  [actual number of targets]
+Domain search space  (domZ):               1  [number of targets reported over threshold]
+# CPU time: 0.00u 0.00s 00:00:00.00 Elapsed: 00:00:00.00
+# Mc/sec: 1.54
+//
+[ok]

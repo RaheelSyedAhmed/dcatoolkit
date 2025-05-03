@@ -6,6 +6,7 @@ import biotite.structure as struc
 import biotite.structure.io.pdbx as pdbx
 import biotite.structure.io.pdb as pdb
 import biotite.database.rcsb as rcsb
+from biotite.sequence import ProteinSequence
 
 from collections.abc import Iterable
 from typing import Optional, Union, Literal, overload
@@ -195,6 +196,8 @@ class ResidueAlignment:
         The sequence of the domain in the query HMM corresponding to this alignment.
     protein_text : str
         The sequence of the protein target sequence corresponding to this alignment.
+    valid_residues : list of tuple of int, str
+        A list of tuples that contain first residue index then residue name (e.g. [(1, 'A'), (2, 'W'), (3, 'C')]  )
 
     Attributes
     ----------
@@ -205,12 +208,69 @@ class ResidueAlignment:
     protein_to_domain : dict[int, int]
         A dictionary allowing for mapping from indices corresponding to the protein target sequence to the query HMM and Multiple Sequence Alignment.
     """
-    def __init__(self, domain_name: str, protein_name: str, domain_start: int, protein_start: int, domain_text: str, protein_text: str) -> None:
+    def __init__(self, domain_name: str, protein_name: str, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: Optional[list[tuple[int, str]]]=None) -> None:
         self.domain_name = domain_name
         self.protein_name = protein_name
-        self.set_reference_mapping(domain_start, protein_start, domain_text, protein_text)
+        self.valid_residues = valid_residues
+        if valid_residues:
+            self._set_restricted_reference_mapping(domain_start, protein_start, domain_text, protein_text, valid_residues)
+        else:
+            self._set_reference_mapping(domain_start, protein_start, domain_text, protein_text)
     
-    def set_reference_mapping(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str) -> None:
+    def _set_restricted_reference_mapping(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: list[tuple[int, str]]) -> None:
+        """
+        Set values for reference_mapping and mapping dictionaries, domain_to_protein and protein_to_domain.
+
+        Parameters
+        ----------
+        valid_residues : list of tuple of int, str
+            List of valid residues, non-missing residues in a structure, in the format of (seq_id, residue_name). These are iteratively selected in the order of the sequence to map to.
+
+        Notes
+        -----
+        For details on `domain_start`, `protein_start`, `domain_text`, `protein_text`, please refer to the `ResidueAlignment` docstring.
+
+        Returns
+        -------
+        None
+        """
+        invalid_chars = [".", "_", "-"]
+        # Convert text to list variant for iteration
+        domain_sequence = list(domain_text)
+        protein_sequence = list(protein_text)
+        # Store mapping values per iteration here.
+        mapping_entries = []
+        
+        # Go through aligned sequences and append data concerning domain index, domain residue, protein residue, and protein index per valid aligned residues.
+        for domain_aa, protein_aa in zip(domain_sequence, protein_sequence):
+            mapping_entry = []
+            if domain_aa not in invalid_chars:
+                mapping_entry.append(domain_start)
+                domain_start += 1
+            else:
+                mapping_entry.append(pd.NA)
+            mapping_entry.append(domain_aa)
+
+            if protein_aa not in invalid_chars:
+                while len(valid_residues) >= protein_start:
+                    prot_index, valid_residue = valid_residues.pop(protein_start-1)
+                    if protein_aa.lower() == valid_residue.lower():
+                        mapping_entry.append(protein_aa)
+                        mapping_entry.append(prot_index)
+                        break
+            else:
+                mapping_entry.append(protein_aa)
+                mapping_entry.append(pd.NA)
+            mapping_entries.append(mapping_entry)
+
+        self.reference_mapping = pd.DataFrame(mapping_entries, columns=['domain_index', 'domain_residue', 'protein_residue', 'protein_index'])
+        self.reference_mapping = self.reference_mapping.astype({'domain_index': pd.Int32Dtype(), 'protein_index': pd.Int32Dtype(), 'domain_residue': pd.StringDtype(), 'protein_residue': pd.StringDtype()})
+        reference_mapping_notna = self.reference_mapping.dropna()
+        
+        self.domain_to_protein = dict(zip(reference_mapping_notna.domain_index, reference_mapping_notna.protein_index))
+        self.protein_to_domain = dict(zip(reference_mapping_notna.protein_index, reference_mapping_notna.domain_index))
+
+    def _set_reference_mapping(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str) -> None:
         """
         Set values for reference_mapping and mapping dictionaries, domain_to_protein and protein_to_domain.
 
@@ -222,25 +282,26 @@ class ResidueAlignment:
         -------
         None
         """
+        invalid_chars = [".", "_", "-"]
         # Convert text to list variant for iteration
         domain_sequence = list(domain_text)
         protein_sequence = list(protein_text)
-        
+        # Store mapping values per iteration here.
         mapping_entries = []
 
-        for i in range(len(domain_sequence)):
+        for domain_aa, protein_aa in zip(domain_sequence, protein_sequence):
             mapping_entry = []
             # Check to see if domain residue is valid, if so, we can assign the proper index.
-            if domain_sequence[i] != '.':
+            if domain_aa not in invalid_chars:
                 mapping_entry.append(domain_start)
                 domain_start += 1
             else:
                 mapping_entry.append(pd.NA)
             # Assign the values of the residues mapped together.
-            mapping_entry.append(domain_sequence[i])
-            mapping_entry.append(protein_sequence[i])
+            mapping_entry.append(domain_aa)
+            mapping_entry.append(protein_aa)
             # Check to see if protein residue is valid, if so, we can assign the proper index.
-            if protein_sequence[i] != '-':
+            if protein_aa not in invalid_chars:
                 mapping_entry.append(protein_start)
                 protein_start += 1
             else:
@@ -282,7 +343,7 @@ class ResidueAlignment:
         89
         """
         # Read the alignment file and parse the important information from each alignment entry.
-        alignment_entries = ResidueAlignment.read_align_file(align_filepath)
+        alignment_entries = ResidueAlignment._read_align_file(align_filepath)
         hmm_entry, protein_entry = alignment_entries
         domain_name, domain_start, domain_text, _ = hmm_entry
         protein_name, protein_start, protein_text, _ = protein_entry
@@ -294,7 +355,7 @@ class ResidueAlignment:
         return ResidueAlignment(domain_name, protein_name, domain_start, protein_start, domain_text, protein_text)
 
     @staticmethod
-    def read_align_file(align_filepath: str) -> list[list[str]]:
+    def _read_align_file(align_filepath: str) -> list[list[str]]:
         """
         Reads standard align file, where a scan file is selected for a particular domain and processed into an align file format. Details are present in produce_align_from_scan().
         
@@ -546,7 +607,7 @@ class DirectInformationData:
         return results
 
     @staticmethod
-    def get_dist_commands(model1: str | int, model2: str | int, chain1: str, chain2: str, pairs: npt.NDArray, ca_only: bool=True, auth_res_ids=False) -> list[str]:
+    def get_dist_commands(model1: str | int, model2: str | int, chain1: str, chain2: str, pairs: npt.NDArray, ca_only: bool=True, auth_res_ids: bool=False) -> list[str]:
         """
         Get UCSF Chimera commands for displaying distance commands for usage in displaying distances between residue pairs. Options are present for alpha-carbon to alpha-carbon distance or for specified atom to specified atom distance.
         
@@ -624,7 +685,7 @@ class StructureInformation:
     """
     @overload
     @staticmethod
-    def fetch_pdb(pdb_id: str, struc_format: Literal["mmcif"]="mmcif", model_num: int=1) -> 'MMCIFInformation':
+    def fetch_pdb(pdb_id: str, struc_format: Literal["mmcif"], model_num: int=1) -> 'MMCIFInformation':
         ...
 
     @overload
@@ -770,9 +831,9 @@ class MMCIFInformation(StructureInformation):
         self.full_sequences = pdbx.get_sequence(pdbx_file)
         non_hetero_structure = self.structure[self.structure.hetero == False]
         self.non_missing_sequences = {str(chain): str(sequence) for (chain, sequence) in list(zip(struc.get_chains(non_hetero_structure), struc.to_sequence(non_hetero_structure)[0]))}
-        self.generate_auth_info()
+        self._generate_auth_info()
 
-    def generate_auth_info(self) -> None:
+    def _generate_auth_info(self) -> None:
         """
         Ran as part of constructor function. Generates information needed to access auth information including auth_seq_id and auth_asym_id, which correspond to alternative chain ids and alternative residue indices.
         
@@ -786,44 +847,51 @@ class MMCIFInformation(StructureInformation):
         """
         if len(self.pdbx_file.keys()) > 0:
             self.first_block = list(self.pdbx_file)[0]
-            self.atom_site_category = self.pdbx_file[self.first_block].get('atom_site')
-            self.chain_auth_dict = {}
-            self.auth_chain_dict = {}
-            self.res_auth_dict = {}
-            if self.atom_site_category:
-                group_pdbs = []
-                seq_ids = []
-                asym_ids = []
-                auth_seq_ids = []
-                auth_asym_ids = []
-                model_nums = []
-                for col_name, col in self.atom_site_category.items():
-                    if col_name == 'group_PDB':
-                        group_pdbs = col.as_array()
-                    elif col_name == 'label_seq_id':
-                        seq_ids = col.as_array()
-                    elif col_name == 'label_asym_id':
-                        asym_ids = col.as_array()
-                    elif col_name == 'auth_seq_id':
-                        auth_seq_ids = col.as_array()
-                    elif col_name == 'auth_asym_id':
-                        auth_asym_ids = col.as_array()
-                    elif col_name == 'pdbx_PDB_model_num':
-                        model_nums = col.as_array()
-
-                atom_site_data = np.unique(np.column_stack((group_pdbs, seq_ids, asym_ids, auth_seq_ids, auth_asym_ids, model_nums)), axis=0)
-                atom_site_data = atom_site_data[atom_site_data[:,5] == str(self.model_num)]
-                self.atom_data = atom_site_data[atom_site_data[:,0] == "ATOM"]
-                self.het_atom_data = atom_site_data[atom_site_data[:,0] == "HETATM"]
-                self.unique_chains = np.unique(self.atom_data[:,2])
+            atom_site_category = self.pdbx_file[self.first_block].get('atom_site')
+            self.chain_auth_dict: dict[str, str] = {}
+            self.auth_chain_dict: dict[str, str] = {}
+            if atom_site_category:
+                categories = ['group_PDB', 'label_seq_id', 'label_asym_id', 'auth_seq_id', 'auth_asym_id', 'pdbx_PDB_model_num']
+                atom_site_data = np.column_stack([atom_site_category[category].as_array() for category in categories])
+                _, idx = np.unique(atom_site_data, axis=0, return_index=True)
+                atom_site_data = atom_site_data[np.sort(idx)]
+                atom_data = atom_site_data[atom_site_data[:,0] == "ATOM"]
+                self.unique_chains = np.unique(atom_data[:,2])
                 for unique_chain in self.unique_chains:
-                    unique_entry = self.atom_data[self.atom_data[:,2] == unique_chain][0]
+                    unique_entry = atom_data[atom_data[:,2] == unique_chain][0]
                     self.chain_auth_dict[unique_entry[2]] = unique_entry[4]
                     self.auth_chain_dict[unique_entry[4]] = unique_entry[2]
-                    self.res_auth_dict[unique_entry[2]] = unique_entry[[1,3]].astype('int')
+                self.atom_site_df = pd.DataFrame(np.column_stack([atom_site_category[category].as_array() for category in atom_site_category.keys()]), columns=atom_site_category.keys())
+                type_conversion_dict = {'label_seq_id': 'int64', 'auth_seq_id': 'int64', 'id': 'int64', 'Cartn_x': 'float', 'Cartn_y': 'float','Cartn_z': 'float', 'B_iso_or_equiv': 'float'}
+                self.atom_df = self.atom_site_df[self.atom_site_df['group_PDB'] == 'ATOM'].astype(type_conversion_dict)
+
+    def get_start_res_id(self, chain_id: str, get_auth_res_ids: bool=False, auth_chain_id_supplied: bool=False) -> int:
+        """
+        Gets starting residue id of the specified chain excluding heteroatom group entries.
+
+        Parameters
+        ----------
+        chain_id : str
+            The chain id supplied and selected for from the structure.
+        get_auth_res_ids : bool
+            True if you want alt_ids for residues indices, False if cif residue indexing is needed.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.            
+
+        Returns
+        -------
+        int
+            The residue id of the first atom in the chain provided.
+        """
+        if auth_chain_id_supplied:
+            chain_df = self.atom_df[self.atom_df['auth_asym_id'] == chain_id]
         else:
-            self.atom_site_category = None
-    
+            chain_df = self.atom_df[self.atom_df['label_asym_id'] == chain_id]
+        if get_auth_res_ids:
+            return chain_df['auth_seq_id'][0]
+        else:
+            return chain_df['label_seq_id'][0]
+
     def get_full_sequence(self, chain_id: str, auth_chain_id_supplied: bool=False) -> str:
         """
         Get full sequence, including missing residues, from the specified chain off of RCSB.
@@ -867,7 +935,7 @@ class MMCIFInformation(StructureInformation):
         else:
             return self.non_missing_sequences[chain_id]
         
-    def get_chain_specific_structure(self, ca_only: bool, chain1: str, chain2: str, remove_hetero=True, auth_chain_id_supplied: bool=False) -> tuple:
+    def get_chain_specific_structure(self, ca_only: bool, chain_id: str, remove_hetero=True, auth_chain_id_supplied: bool=False):
         """
         Subsets structure attribute to select for chain specific portions of the structure.
 
@@ -875,10 +943,8 @@ class MMCIFInformation(StructureInformation):
         ----------
         ca_only : bool
             If true, the structure will also be subsetted for atom entries where the atom_name annotation is "CA" (referring to alpha-carbons)
-        chain1 : str
-            Chain id corresponding to the first column of residues in the structure.
-        chain2 : str
-            Chain id corresponding to the second column of residues in the structure.
+        chain_id : str
+            The name of the chain to be selected for within the structure.
         remove_hetero : bool, default=True
             If true, the structure will also be subsetted for atom entries where the hetero annotation is False, thus removing heteroatoms.
         auth_chain_id_supplied : bool
@@ -890,9 +956,7 @@ class MMCIFInformation(StructureInformation):
             Two AtomArrays that refer to atoms in the first chain and second chain, respectively without accounting for the presence of heteroatoms if `remove_hetero` is True.
         """
         if auth_chain_id_supplied:
-            chain1 = self.auth_chain_dict[chain1]
-            chain2 = self.auth_chain_dict[chain2]
-
+            chain_id = self.auth_chain_dict[chain_id]
         selected_structure = self.structure
         if remove_hetero:
             # Remove hetero atoms via hetero column of structure ndarray
@@ -900,9 +964,85 @@ class MMCIFInformation(StructureInformation):
         if ca_only:
             # Consider selection of alpha-carbon atoms only
             selected_structure = selected_structure[selected_structure.atom_name == "CA"]
-        chain1_structure = selected_structure[selected_structure.chain_id == chain1]
-        chain2_structure = selected_structure[selected_structure.chain_id == chain2]
-        return (chain1_structure, chain2_structure)
+        chain_structure = selected_structure[selected_structure.chain_id == chain_id]
+        return chain_structure
+    
+    def get_chain_site_data(self, ca_only: bool, chain_id: str, remove_hetero=True, auth_chain_id_supplied: bool=False):
+        """
+        Subsets the atom_site dataframe to get atom information where the conditions are met.
+
+        Parameters
+        ----------
+        ca_only : bool
+            If true, the dataframe will also be subsetted for atom entries where the label_atom_id annotation is "CA" (referring to alpha-carbons)
+        chain_id : str
+            The name of the chain to be selected for within the dataframe.
+        remove_hetero : bool, default=True
+            If true, the dataframe will also be subsetted for atom entries where the group_PDB annotation is ATOM rather than HETATM, thus removing heteroatoms.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+        """
+        atom_df = self.atom_df.copy()
+        if ca_only:
+            atom_df = atom_df[atom_df['label_atom_id'] == 'CA']
+        if remove_hetero:
+            atom_df = atom_df[atom_df['group_PDB'] == 'ATOM']
+        if auth_chain_id_supplied:
+            return atom_df[atom_df['auth_asym_id'] == chain_id]
+        else:
+            return atom_df[atom_df['label_asym_id'] == chain_id]
+        
+    def get_seq_id_mapping(self, chain_id: str, seq_to_auth: bool, auth_chain_id_supplied: bool=False) -> dict[int, int]:
+        """
+        Gets mapping from auth seq ids to label seq ids or vice-versa.
+
+        Parameters
+        ----------
+        chain_id : str
+            Chain id of the chain addressed for determining residue index mappings.
+        seq_to_auth : bool
+            If True, this indicates the mapping uses the label_seq_id as a key and the auth_seq_id as a value. Otherwise, keys and values are switched.
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+
+        Returns
+        -------
+        dict of int, int
+            Dictionary with either label seq id or auth seq id as a key and the other as a value. The directionality is dependent on seq_to_auth.
+        """
+        chain_df = self.get_chain_site_data(ca_only=True, chain_id=chain_id, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        if seq_to_auth: 
+            return dict(zip(chain_df['label_seq_id'], chain_df['auth_seq_id']))
+        else:
+            return dict(zip(chain_df['auth_seq_id'], chain_df['label_seq_id']))
+    
+    def get_valid_chain_residues(self, chain_id: str, auth_seq_id: bool=False, auth_chain_id_supplied: bool=False) -> list[tuple[int, str]]:
+        """
+        Gets valid indexing for residues of a specified chain. This is directly analogous to get_non_missing_sequence, does not contain missing residues, and provides the corresponding indices as well.
+
+        Parameters
+        ----------
+        chain_id : str
+            Chain id of the chain to be selected from the structure. This chain's sequence and corresponding residue indices are what are exclusively selected for.
+        auth_seq_id: bool
+            If True, the seq_ids that are the first element of the tuples in the returned list are auth_seq_ids. 
+        auth_chain_id_supplied : bool
+            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+        
+        Returns
+        -------
+        list of tuple of int, str
+            A list of residue information in sequential order reflecting the structure. The list consists of tuple elements where each tuple is the residue index and its corresponding one-letter amino acid.
+        """
+        chain_structure = self.get_chain_specific_structure(ca_only=True, chain_id=chain_id, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        res_ids = chain_structure.res_id.tolist()
+        res_names = chain_structure.res_name
+        if auth_seq_id:
+            seq_id_mapping = self.get_seq_id_mapping(chain_id=chain_id, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+            auth_res_ids = [seq_id_mapping[res_id] for res_id in res_ids]
+            return list(zip(auth_res_ids, map(lambda symbol: ProteinSequence.convert_letter_3to1(symbol), res_names)))
+        else:
+            return list(zip(res_ids, map(lambda symbol: ProteinSequence.convert_letter_3to1(symbol), res_names)))
 
     def generate_dist_matrix(self, ca_only: bool, chain1: str, chain2: str, auth_chain_id_supplied: bool=False):
         """
@@ -924,40 +1064,10 @@ class MMCIFInformation(StructureInformation):
         tuple of biotite.structure.AtomArray, biotite.structure.AtomArray, numpy.ndarray
             Tuple containing the chain 1 structure, the chain 2 structure, and the distance matrix of chain 1 and chain 2's pairwise distances.
         """
-        chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only, chain1, chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        chain1_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain1, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        chain2_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
         dist_matrix = cdist(chain1_structure.coord, chain2_structure.coord)
         return (chain1_structure, chain2_structure, dist_matrix)
-    
-    def get_shift_values(self, chain1: str, chain2: str, auth_chain_id_supplied: bool=False) -> tuple[int, int]:
-        """
-        Get shift values needed for production of auth residue ids.
-        
-        Parameters
-        ----------
-        chain1 : str
-            Name of the chain id present referring to the second column of residues.
-        chain2 : str
-            Name of the chain id present referring to the second column of residues.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
-
-        Returns
-        -------
-        (shift1, shift2) : tuple of int, int
-            Tuple containing both shift values, the difference between the auth_res_id and res_id.
-        """
-        if auth_chain_id_supplied:
-            chain1 = self.auth_chain_dict[chain1]
-            chain2 = self.auth_chain_dict[chain2]
-
-        shift1 = 0
-        shift2 = 0
-        if self.atom_site_category:
-            shift1 = self.res_auth_dict[chain1][1] - self.res_auth_dict[chain1][0]
-            shift2 = self.res_auth_dict[chain2][1] - self.res_auth_dict[chain2][0]
-            return shift1, shift2
-        else:
-            return shift1, shift2
 
     def get_min_dist_atom_info(self, pairs: npt.NDArray, chain1: str, chain2: str, auth_chain_id_supplied: bool=False) -> npt.NDArray:
         """
@@ -979,8 +1089,8 @@ class MMCIFInformation(StructureInformation):
         min_dist_pairs_atoms_arr : numpy.ndarray
             Structured ndarray that has residue indices, auth residue indices (corresponding to the protein numbering), and atomic names in the format {'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']}
         """
-        shift1, shift2 = self.get_shift_values(chain1, chain2, auth_chain_id_supplied=auth_chain_id_supplied)
-        chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only=False, chain1=chain1, chain2=chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        chain1_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain1, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        chain2_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
         min_dist_pairs_atoms = []
         for row in pairs:
             # Obtain structure information for chains 1 and 2
@@ -993,13 +1103,15 @@ class MMCIFInformation(StructureInformation):
             ind = np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
             # Use the indices to access the atom in the atom array and get the correct atom name.
             # Generate the auth ids of the residues in the pairs ndarray
-            auth_res_id1 = row['residue1'] + shift1
-            auth_res_id2 = row['residue2'] + shift2
+            seq_mapping_chain1 = self.get_seq_id_mapping(chain_id=chain1, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+            seq_mapping_chain2 = self.get_seq_id_mapping(chain_id=chain2, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+            auth_res_id1 = seq_mapping_chain1[row['residue1']]
+            auth_res_id2 = seq_mapping_chain2[row['residue2']]
             min_dist_pairs_atoms.append((row['residue1'], row['residue2'], auth_res_id1, auth_res_id2, chain1_res1_structure[ind[0]].atom_name, chain2_res2_structure[ind[1]].atom_name))
         min_dist_pairs_atoms_arr = np.array(min_dist_pairs_atoms, dtype={'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']})
         return min_dist_pairs_atoms_arr
 
-    def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str, auth_contacts: bool=False, auth_chain_id_supplied: bool=False) -> set[tuple[int, int]]:
+    def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str, auth_seq_id: bool=False, auth_chain_id_supplied: bool=False) -> set[tuple[int, int]]:
         """
         Get contacts from the structure attribute where the distance between two residues is less than the threshold.
 
@@ -1013,8 +1125,8 @@ class MMCIFInformation(StructureInformation):
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
             Chain id corresponding to the second column of residues in the structure.
-        auth_contacts : bool
-            True if you want alt_ids for residues indices, False if cif residue indexing is needed.
+        auth_seq_id : bool
+            True if you want auth_seq_ids for residues indices, False if cif residue indexing is needed.
         auth_chain_id_supplied : bool
             If True, the chain_id supplied is the auth chain id found on the RCSB website.
 
@@ -1023,7 +1135,6 @@ class MMCIFInformation(StructureInformation):
         contacts_set : set of tuple of ints
             Set of contacts, tuples with "residue1" and "residue2" from the structure that are within the distance threshold.
         """
-        
         chain1_structure, chain2_structure, dist_matrix = self.generate_dist_matrix(ca_only, chain1, chain2, auth_chain_id_supplied=auth_chain_id_supplied)
         thresh_ind = np.argwhere(dist_matrix <= threshold)
         contacts_set = set()
@@ -1033,9 +1144,10 @@ class MMCIFInformation(StructureInformation):
             res1 = chain1_atom.res_id
             res2 = chain2_atom.res_id
             if not(chain1==chain2 and res1 >= res2):
-                if auth_contacts:
-                    shift1, shift2 = self.get_shift_values(chain1, chain2, auth_chain_id_supplied=auth_chain_id_supplied)
-                    contacts_set.add((res1 + shift1, res2 + shift2))
+                if auth_seq_id:
+                    seq_mapping_chain1 = self.get_seq_id_mapping(chain_id=chain1, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+                    seq_mapping_chain2 = self.get_seq_id_mapping(chain_id=chain2, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+                    contacts_set.add((seq_mapping_chain1[res1], seq_mapping_chain2[res2]))
                 else:
                     contacts_set.add((res1, res2))
         return contacts_set
@@ -1067,6 +1179,26 @@ class PDBInformation(StructureInformation):
         self.non_missing_sequences = {str(chain): str(sequence) for (chain, sequence) in list(zip(struc.get_chains(non_hetero_structure), struc.to_sequence(non_hetero_structure)[0]))}
         self.unique_chains = struc.get_chains(non_hetero_structure)
 
+    def get_start_res_id(self, chain_id: str) -> int:
+        """
+        Gets starting residue id of the specified chain excluding heteroatom group entries.
+
+        Parameters
+        ----------
+        chain_id : str
+            The chain id supplied and selected for from the structure.
+
+        Returns
+        -------
+        int
+            The residue id of the first atom in the chain provided.
+        """
+        non_hetero_structure = self.structure[self.structure.hetero == False]
+        if chain_id in self.unique_chains:
+            return non_hetero_structure[non_hetero_structure.chain_id == chain_id][0].res_id
+        else:
+            raise ValueError("Chain supplied not found in structure.")
+
     def get_non_missing_sequence(self, chain_id: str) -> str:
         """
         Get sequence, including only non-missing residues, from the specified chain.
@@ -1083,7 +1215,7 @@ class PDBInformation(StructureInformation):
         """
         return self.non_missing_sequences[chain_id]
     
-    def get_chain_specific_structure(self, ca_only: bool, chain1: str, chain2: str, remove_hetero=True) -> tuple:
+    def get_chain_specific_structure(self, ca_only: bool, chain_id: str, remove_hetero=True):
         """
         Subsets structure attribute to select for chain specific portions of the structure.
 
@@ -1103,7 +1235,6 @@ class PDBInformation(StructureInformation):
         tuple of biotite.structure.AtomArray, biotite.structure.AtomArray
             Two AtomArrays that refer to atoms in the first chain and second chain, respectively without accounting for the presence of heteroatoms if `remove_hetero` is True.
         """
-
         selected_structure = self.structure
         if remove_hetero:
             # Remove hetero atoms via hetero column of structure ndarray
@@ -1111,10 +1242,26 @@ class PDBInformation(StructureInformation):
         if ca_only:
             # Consider selection of alpha-carbon atoms only
             selected_structure = selected_structure[selected_structure.atom_name == "CA"]
-        chain1_structure = selected_structure[selected_structure.chain_id == chain1]
-        chain2_structure = selected_structure[selected_structure.chain_id == chain2]
-        return (chain1_structure, chain2_structure)
+        chain_structure = selected_structure[selected_structure.chain_id == chain_id]
+        return chain_structure
     
+    def get_valid_chain_residues(self, chain_id: str) -> list[tuple[int, str]]:
+        """
+        Gets valid indexing for residues of a specified chain. This is directly analogous to get_non_missing_sequence, does not contain missing residues, and provides the corresponding indices as well.
+
+        Parameters
+        ----------
+        chain_id : str
+            Chain id of the chain to be selected from the structure. This chain's sequence and corresponding residue indices are what are exclusively selected for.
+        
+        Returns
+        -------
+        list of tuple of int, str
+            A list of residue information in sequential order reflecting the structure. The list consists of tuple elements where each tuple is the residue index and its corresponding one-letter amino acid.
+        """
+        chain_structure = self.get_chain_specific_structure(ca_only=True, chain_id=chain_id, remove_hetero=True)
+        return list(zip(chain_structure.res_id.tolist(), map(lambda symbol: ProteinSequence.convert_letter_3to1(symbol), chain_structure.res_name)))
+
     def generate_dist_matrix(self, ca_only: bool, chain1: str, chain2: str):
         """
         Generates distance matrix between two chains in the structure attribute.
@@ -1133,35 +1280,10 @@ class PDBInformation(StructureInformation):
         tuple of biotite.structure.AtomArray, biotite.structure.AtomArray, numpy.ndarray
             Tuple containing the chain 1 structure, the chain 2 structure, and the distance matrix of chain 1 and chain 2's pairwise distances.
         """
-        chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only, chain1, chain2, remove_hetero=True)
+        chain1_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain1, remove_hetero=True)
+        chain2_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain2, remove_hetero=True)
         dist_matrix = cdist(chain1_structure.coord, chain2_structure.coord)
         return (chain1_structure, chain2_structure, dist_matrix)
-
-    def get_shift_values(self, chain1: str, chain2: str) -> tuple[int, int]:
-        """
-        Get shift values needed for production of auth residue ids.
-        
-        Parameters
-        ----------
-        chain1 : str
-            Name of the chain id present in the struct_ref_seq block of cif files referring to the second column of residues.
-        chain2 : str
-            Name of the chain id present in the struct_ref_seq block of cif files referring to the second column of residues.
-
-        Returns
-        -------
-        (shift1, shift2) : tuple of int, int
-            Tuple containing both shift values, the difference between the auth_res_id and res_id.
-        """
-        non_hetero_structure = self.structure[self.structure.hetero == False]
-        shift1 = 0
-        shift2 = 0
-        if chain1 in self.unique_chains and chain2 in self.unique_chains:
-            shift1 = non_hetero_structure[non_hetero_structure.chain_id == chain1][0].res_id - 1
-            shift2 = non_hetero_structure[non_hetero_structure.chain_id == chain2][0].res_id - 1
-            return shift1, shift2
-        else:
-            return shift1, shift2
 
     def get_min_dist_atom_info(self, pairs: npt.NDArray, chain1: str, chain2: str) -> npt.NDArray:
         """
@@ -1181,8 +1303,8 @@ class PDBInformation(StructureInformation):
         min_dist_pairs_atoms_arr : numpy.ndarray
             Structured ndarray that has residue indices, auth residue indices (corresponding to the protein numbering), and atomic names in the format {'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']}
         """
-        shift1, shift2 = self.get_shift_values(chain1, chain2)
-        chain1_structure, chain2_structure = self.get_chain_specific_structure(ca_only=False, chain1=chain1, chain2=chain2, remove_hetero=True)
+        chain1_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain1, remove_hetero=True)
+        chain2_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain2, remove_hetero=True)
         min_dist_pairs_atoms = []
         for row in pairs:
             # Obtain structure information for chains 1 and 2
@@ -1193,15 +1315,11 @@ class PDBInformation(StructureInformation):
             dist_matrix = cdist(chain1_res1_structure.coord, chain2_res2_structure.coord)
             
             ind = np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
-            # Use the indices to access the atom in the atom array and get the correct atom name.
-            # Generate the auth ids of the residues in the pairs ndarray
-            orig_res_id1 = row['residue1'] - shift1
-            orig_res_id2 = row['residue2'] - shift2
-            min_dist_pairs_atoms.append((orig_res_id1, orig_res_id2, row['residue1'], row['residue2'], chain1_res1_structure[ind[0]].atom_name, chain2_res2_structure[ind[1]].atom_name))
+            min_dist_pairs_atoms.append((row['residue1'], row['residue2'], row['residue1'], row['residue2'], chain1_res1_structure[ind[0]].atom_name, chain2_res2_structure[ind[1]].atom_name))
         min_dist_pairs_atoms_arr = np.array(min_dist_pairs_atoms, dtype={'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']})
         return min_dist_pairs_atoms_arr    
 
-    def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str, auth_contacts: bool=False) -> set[tuple[int, int]]:
+    def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str) -> set[tuple[int, int]]:
         """
         Get contacts from the structure attribute where the distance between two residues is less than the threshold.
 
@@ -1215,8 +1333,6 @@ class PDBInformation(StructureInformation):
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
             Chain id corresponding to the second column of residues in the structure.
-        auth_contacts : bool
-            True if you want alt_ids for residues indices, False if cif residue indexing is needed.
 
         Returns
         -------
@@ -1233,9 +1349,5 @@ class PDBInformation(StructureInformation):
             res1 = chain1_atom.res_id
             res2 = chain2_atom.res_id
             if not(chain1==chain2 and res1 >= res2):
-                if not auth_contacts:
-                    shift1, shift2 = self.get_shift_values(chain1, chain2)
-                    contacts_set.add((res1 - shift1, res2 - shift2))
-                else:
-                    contacts_set.add((res1, res2))
+                contacts_set.add((res1, res2))
         return contacts_set

@@ -8,11 +8,11 @@ btr1_complex_3 = StructureInformation.read_mmCIF_file("examples/files/fold_cry1a
 btr1_complex_4 = StructureInformation.read_mmCIF_file("examples/files/fold_cry1ab_ec12_model_4.cif")
 
 # Getting contacts between proteins A and B
-contacts_0 = btr1_complex_0.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_contacts=True)
-contacts_1 = btr1_complex_1.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_contacts=True)
-contacts_2 = btr1_complex_2.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_contacts=True)
-contacts_3 = btr1_complex_3.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_contacts=True)
-contacts_4 = btr1_complex_4.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_contacts=True)
+contacts_0 = btr1_complex_0.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_seq_id=True)
+contacts_1 = btr1_complex_1.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_seq_id=True)
+contacts_2 = btr1_complex_2.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_seq_id=True)
+contacts_3 = btr1_complex_3.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_seq_id=True)
+contacts_4 = btr1_complex_4.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_seq_id=True)
 
 # Selecting the residue 1 indices of those contacts
 cry1_contacts_0 = [x[0] for x in contacts_0]
@@ -44,4 +44,4 @@ print()
 print(DirectInformationData.find_DI_with_residues(cry1_contacts_4, contacts_critical, 300, M_R, C_R))
 
 # Writing out information of contacts within a threshold to a file.
-StructureInformation.write_contacts_set("examples/outputs/btr1_complex_contacts_0",btr1_complex_0.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_contacts=True))
+StructureInformation.write_contacts_set("examples/outputs/btr1_complex_contacts_0",btr1_complex_0.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_seq_id=True))
