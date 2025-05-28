@@ -1,8 +1,11 @@
 import re
 from collections import Counter
-from typing import Optional, Union
+from collections.abc import Callable
+from typing import Optional, Union, Literal
 import string
 import io
+import numpy as np
+import numpy.typing as npt
 
 class MSATools:
     """
@@ -122,6 +125,28 @@ class MSATools:
                     kept_entries.append((header, sequence))
         return kept_entries
 
+    def gap_proportion(self, agg_func: Callable[..., float | int]=np.mean, axis: Literal[0, 1] = 0) -> float | int:
+        """
+        Evaluates gap frequency per alignment position, or column, in the MSA.
+
+        Parameters
+        ----------
+        agg_func: function = np.mean
+            The aggregation function applied to get the expected result, usually a mean, max, or min value, of the gap frequencies present per alignment position in the MSA.
+        axis: int or str
+            When axis is 0, the aggregation function is applied per column for entries from every row in that column. When axis is 1, the aggregation function is applied per row for entries from every column in that row.
+        
+        Return
+        ------
+        float
+            A numerical value determined by the aggregation function supplied over the gap frequencies of the alignment positions in the MSA.
+        """
+        sequence_matrix = self.as_matrix()
+        non_alpha_counts = np.sum(~np.char.isalpha(sequence_matrix), axis)
+        non_alpha_counts = non_alpha_counts / sequence_matrix.shape[axis]
+        return agg_func(non_alpha_counts)
+        
+
     def write(self, destination: Union[str, io.IOBase]) -> None:
         """
         Writes this MSA's headers and sequences to the destination specified.
@@ -149,6 +174,28 @@ class MSATools:
                 destination.write(sequence)
                 destination.write("\n")
 
+    def as_matrix(self) -> npt.NDArray:
+        """
+        Represents the MSA as a numpy matrix of sequences.
+
+        Returns
+        -------
+        npt.NDArray
+            A matrix of "number of sequences" rows and "number of alignment positions" columns. Each cell is the sequence character for that sequence at that position.
+        """
+        return np.array([list(seq) for _, seq in self.MSA])
+
+    def __str__(self) -> str:
+        """
+        Returns the sequences present in the loaded MSA in string format.
+
+        Returns
+        -------
+        str
+            Each sequence in the instance separated with newline characters.
+        """
+        return "\n".join([seq for _, seq in self.MSA])
+    
     def __len__(self):
         """
         Returns the number of sequences, and equivalently, the number of headers in the MSA.
