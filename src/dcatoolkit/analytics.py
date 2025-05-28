@@ -145,7 +145,6 @@ class MSATools:
         non_alpha_counts = np.sum(~np.char.isalpha(sequence_matrix), axis)
         non_alpha_counts = non_alpha_counts / sequence_matrix.shape[axis]
         return agg_func(non_alpha_counts)
-        
 
     def write(self, destination: Union[str, io.IOBase]) -> None:
         """
