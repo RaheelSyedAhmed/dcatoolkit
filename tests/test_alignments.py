@@ -52,7 +52,7 @@ test_cases = [
     (33, 9, 'FACARAA', 'FACAR--')
 ]
 test_cases_validation = [
-    (42, 28, 'ALMAY', 'ALMAY', ),
+    (42, 28, 'ALMAY', 'ALMAY'),
     (14, 11, 'VAIDTSK', 'VAID--K'),
     (10, 5, 'NG.TA', 'NG-TA'),
     (2, 44, 'STWLPL', 'SAWLPL'),

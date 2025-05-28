@@ -78,18 +78,18 @@ def check_contacts(test_CA: bool, threshold: float):
             compare(fetch_cif_contacts, fetch_pdb_contacts, read_cif_contacts, read_pdb_contacts)
             print(f"{pdb_id} has no difference between cif and pdb reading.")
 
-            #compare(fetch_cif_contacts, fetch_authchain_cif_contacts, read_cif_contacts, read_authchain_cif_contacts)
-            #print(f"{pdb_id} has no issue reading with auth chains and asym chains.")
+            compare(fetch_cif_contacts, fetch_authchain_cif_contacts, read_cif_contacts, read_authchain_cif_contacts)
+            print(f"{pdb_id} has no issue reading with auth chains and asym chains.")
 
-            #compare(fetch_cif_contacts, cif_file_contacts)
-            #print(f"{pdb_id} has no difference between cif and interface_contacts_X.py reading.")
+            compare(fetch_cif_contacts, cif_file_contacts)
+            print(f"{pdb_id} has no difference between cif and interface_contacts_X.py reading.")
         else:
-            #compare(fetch_cif_contacts, fetch_pdb_contacts, read_cif_contacts, read_pdb_contacts)
-            #print(f"{pdb_id} has no difference between cif and pdb reading.")
-            ...
-            #compare(fetch_cif_contacts, fetch_authchain_cif_contacts, read_cif_contacts, read_authchain_cif_contacts)
-            #print(f"{pdb_id} has no issue reading with auth chains and asym chains.")
+            compare(fetch_cif_contacts, fetch_pdb_contacts, read_cif_contacts, read_pdb_contacts)
+            print(f"{pdb_id} has no difference between cif and pdb reading.")
+            
+            compare(fetch_cif_contacts, fetch_authchain_cif_contacts, read_cif_contacts, read_authchain_cif_contacts)
+            print(f"{pdb_id} has no issue reading with auth chains and asym chains.")
         
 def test_contacts():
     check_contacts(test_CA=True, threshold=10)
-    #check_contacts(test_CA=False, threshold=8)
+    check_contacts(test_CA=False, threshold=8)

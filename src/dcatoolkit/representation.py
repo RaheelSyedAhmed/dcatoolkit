@@ -1140,6 +1140,8 @@ class MMCIFInformation(StructureInformation):
             Set of contacts, tuples with "residue1" and "residue2" from the structure that are within the distance threshold.
         """
         chain1_structure, chain2_structure, dist_matrix = self.generate_dist_matrix(ca_only, chain1, chain2, auth_chain_id_supplied=auth_chain_id_supplied)
+        seq_mapping_chain1 = self.get_seq_id_mapping(chain_id=chain1, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        seq_mapping_chain2 = self.get_seq_id_mapping(chain_id=chain2, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
         thresh_ind = np.argwhere(dist_matrix <= threshold)
         contacts_set = set()
         for indices in thresh_ind:
@@ -1149,8 +1151,6 @@ class MMCIFInformation(StructureInformation):
             res2 = chain2_atom.res_id
             if not(chain1==chain2 and res1 >= res2):
                 if auth_seq_id:
-                    seq_mapping_chain1 = self.get_seq_id_mapping(chain_id=chain1, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
-                    seq_mapping_chain2 = self.get_seq_id_mapping(chain_id=chain2, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
                     contacts_set.add((seq_mapping_chain1[res1], seq_mapping_chain2[res2]))
                 else:
                     contacts_set.add((res1, res2))
