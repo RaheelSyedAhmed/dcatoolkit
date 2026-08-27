@@ -50,5 +50,5 @@ docs = [
   "numpydoc"
 ]
 lint = [
-  "ruffle",
+  "ruff",
 ]
