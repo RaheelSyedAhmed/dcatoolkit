@@ -1,5 +1,7 @@
 
-__version__ = "0.2.3"
+from importlib.metadata import version as _version
+
+__version__ = _version("dcatoolkit")
 from .representation import Pairs, DirectInformationData, StructureInformation, ResidueAlignment, MMCIFInformation, PDBInformation
 from .analytics import MSATools
 
