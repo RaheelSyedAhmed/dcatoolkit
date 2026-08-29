@@ -1,7 +1,7 @@
 from context import ResidueAlignment
 import pandas as pd
 
-test_cases = """
+test_cases_description = """
 Test Case 1
 First:  MA.KLT
 Second: MAAKLT
@@ -44,7 +44,7 @@ Second: H--TAR--C
 """
 
 
-test_cases = [
+test_cases : list[tuple[int, int, str, str]] = [
     (47, 15, 'MA.KLT', 'MAAKLT'),
     (39, 3, 'Q..EWLP', 'QATEWLP'),
     (8, 45, 'D.G.H.V', 'DAGAHAV'),
@@ -73,6 +73,7 @@ test_answers = [
 ]
 
 def test_residue_alignments():
+    test_num = 0
     for test_num, test_case in enumerate(test_cases):
         domain_start, protein_start, first_seq, second_seq = test_case
         module_result = list(ResidueAlignment(f"Test_{test_num}", f"Test {test_num}", domain_start, protein_start, first_seq, second_seq).reference_mapping.itertuples(index=False, name=None))
@@ -86,3 +87,42 @@ def test_residue_alignments():
 
 # Can handle excess residues, but not missing any ones that are supposed to be there.
 print(ResidueAlignment('name1', 'name2', 1, 1, 'MAAFT', 'MAAFT', valid_residues=[(5, 'M'), (6, 'A'), (7, 'A'), (8, 'R'), (12, 'F')]))
+
+def test_reference_mapping_base_case_with_gaps():
+    # Gaps on both sides: domain 'C' (2) aligns to a protein gap, protein 'C' (2) aligns to a domain gap.
+    # Neither should map to the other since they're different alignment columns.
+    ra = ResidueAlignment('dom', 'prot', 1, 1, 'AC-D', 'A-CD')
+    assert ra.domain_to_protein == {1: 1, 3: 3}
+    assert ra.protein_to_domain == {1: 1, 3: 3}
+
+def test_reference_mapping_base_case_sequential():
+    ra = ResidueAlignment('dom', 'prot', 5, 9, 'ACD', 'ACD')
+    assert ra.domain_to_protein == {5: 9, 6: 10, 7: 11}
+
+def test_reference_mapping_restricted_repeated_residues():
+    # Regression test: a naive re-copy of valid_residues per outer-loop iteration would
+    # collapse every position onto the first matching residue (1,2,3 -> 10,10,10) instead
+    # of correctly advancing through valid_residues as each one is consumed.
+    valid_residues = [(10, 'A'), (11, 'A'), (12, 'A')]
+    ra = ResidueAlignment('dom', 'prot', 1, 1, 'AAA', 'AAA', valid_residues=valid_residues)
+    assert ra.domain_to_protein == {1: 10, 2: 11, 3: 12}
+    # The caller's original list must not be mutated.
+    assert valid_residues == [(10, 'A'), (11, 'A'), (12, 'A')]
+
+def test_reference_mapping_restricted_skips_mismatched_residues():
+    # valid_residues contains (101, 'X'), which never appears in protein_text at all.
+    # The algorithm should skip over it and resynchronize on the next match.
+    valid_residues = [(100, 'A'), (101, 'X'), (102, 'C'), (103, 'D')]
+    ra = ResidueAlignment('dom', 'prot', 1, 1, 'ACD', 'ACD', valid_residues=valid_residues)
+    assert ra.domain_to_protein == {1: 100, 2: 102, 3: 103}
+
+def test_reference_mapping_restricted_with_gaps():
+    valid_residues = [(1, 'A'), (2, 'C'), (3, 'D')]
+    ra = ResidueAlignment('dom', 'prot', 1, 1, 'AC-D', 'A-CD', valid_residues=valid_residues)
+    assert ra.domain_to_protein == {1: 1, 3: 3}
+
+def test_reference_mapping_restricted_exhausted_falls_back_to_na():
+    # valid_residues runs out before the alignment does; the remaining protein_index values should be NA.
+    ra = ResidueAlignment('dom', 'prot', 1, 1, 'AC', 'AC', valid_residues=[(1, 'A')])
+    assert ra.domain_to_protein == {1: 1}
+    assert pd.isna(ra.reference_mapping.iloc[1]['protein_index'])
