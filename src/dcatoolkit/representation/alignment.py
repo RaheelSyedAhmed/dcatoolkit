@@ -19,7 +19,7 @@ class ResidueAlignment:
         The sequence of the domain in the query HMM corresponding to this alignment.
     protein_text : str
         The sequence of the protein target sequence corresponding to this alignment.
-    valid_residues : list of tuple of int, str
+    valid_residues : list of tuple of int, str, optional
         A list of tuples that contain first residue index then residue name (e.g. [(1, 'A'), (2, 'W'), (3, 'C')]  )
 
     Attributes
@@ -31,114 +31,87 @@ class ResidueAlignment:
     protein_to_domain : dict[int, int]
         A dictionary allowing for mapping from indices corresponding to the protein target sequence to the query HMM and Multiple Sequence Alignment.
     """
+    _INVALID_CHARS = {".", "_", "-"}
     def __init__(self, domain_name: str, protein_name: str, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: Optional[list[tuple[int, str]]]=None) -> None:
         self.domain_name = domain_name
         self.protein_name = protein_name
         self.valid_residues = valid_residues
-        if valid_residues:
-            self._set_restricted_reference_mapping(domain_start, protein_start, domain_text, protein_text, valid_residues)
-        else:
-            self._set_reference_mapping(domain_start, protein_start, domain_text, protein_text)
-    
-    def _set_restricted_reference_mapping(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: list[tuple[int, str]]) -> None:
+        self._set_reference_mapping(domain_start, protein_start, domain_text, protein_text, valid_residues)
+
+    def _row_stream(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: Optional[list[tuple[int, str]]]):
+        """
+        Generates one mapping row per aligned position in domain_text/protein_text, resolving each side's residue index independently.
+
+        Parameters
+        ----------
+        domain_start : int
+            The starting index of the domain alignment in the query HMM.
+        protein_start : int
+            The starting index of the domain alignment in the protein target sequence.
+        domain_text : str
+            The sequence of the domain in the query HMM corresponding to this alignment.
+        protein_text : str
+            The sequence of the protein target sequence corresponding to this alignment.
+        valid_residues : list of tuple of int, str, optional
+            List of valid residues, non-missing residues in a structure, in the format of (seq_id, residue_name). When supplied, protein_index is resolved by scanning forward through this list for a matching residue letter (permanently skipping any that don't match) rather than a simple sequential count. When None, protein_index is assigned by incrementing protein_start for every non-gap protein residue.
+
+        Yields
+        ------
+        tuple of (int or pandas.NA), str, str, (int or pandas.NA)
+            One row per aligned position: domain_index (pd.NA if the domain character is a gap), domain_residue, protein_residue, and protein_index (pd.NA if the protein character is a gap, or if `valid_residues` was supplied but exhausted without a match).
+        """
+        pointer = protein_start - 1
+        for domain_aa, protein_aa in zip(domain_text, protein_text):
+            if domain_aa in ResidueAlignment._INVALID_CHARS:
+                domain_index = pd.NA
+            else:
+                domain_index = domain_start
+                domain_start += 1
+
+            if protein_aa in ResidueAlignment._INVALID_CHARS:
+                protein_index = pd.NA
+            elif valid_residues:
+                protein_index = pd.NA
+                while pointer < len(valid_residues):
+                    prot_index, valid_residue = valid_residues[pointer]
+                    pointer += 1
+                    if protein_aa.lower() == valid_residue.lower():
+                        protein_index = prot_index
+                        break
+            else:
+                protein_index = protein_start
+                protein_start += 1
+
+            yield domain_index, domain_aa, protein_aa, protein_index
+
+    def _set_reference_mapping(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: Optional[list[tuple[int, str]]]) -> None:
         """
         Set values for reference_mapping and mapping dictionaries, domain_to_protein and protein_to_domain.
 
         Parameters
         ----------
-        valid_residues : list of tuple of int, str
-            List of valid residues, non-missing residues in a structure, in the format of (seq_id, residue_name). These are iteratively selected in the order of the sequence to map to.
-
-        Notes
-        -----
-        For details on `domain_start`, `protein_start`, `domain_text`, `protein_text`, please refer to the `ResidueAlignment` docstring.
-
-        Returns
-        -------
-        None
-        """
-        invalid_chars = [".", "_", "-"]
-        # Convert text to list variant for iteration
-        domain_sequence = list(domain_text)
-        protein_sequence = list(protein_text)
-        # Store mapping values per iteration here.
-        mapping_entries = []
-        
-        # Go through aligned sequences and append data concerning domain index, domain residue, protein residue, and protein index per valid aligned residues.
-        for domain_aa, protein_aa in zip(domain_sequence, protein_sequence):
-            mapping_entry = []
-            if domain_aa not in invalid_chars:
-                mapping_entry.append(domain_start)
-                domain_start += 1
-            else:
-                mapping_entry.append(pd.NA)
-            mapping_entry.append(domain_aa)
-
-            if protein_aa not in invalid_chars:
-                while len(valid_residues) >= protein_start:
-                    prot_index, valid_residue = valid_residues.pop(protein_start-1)
-                    if protein_aa.lower() == valid_residue.lower():
-                        mapping_entry.append(protein_aa)
-                        mapping_entry.append(prot_index)
-                        break
-                else:
-                    # Default case for if valid residues are missing towards the end.
-                    mapping_entry.append(protein_aa)
-                    mapping_entry.append(pd.NA)
-            else:
-                mapping_entry.append(protein_aa)
-                mapping_entry.append(pd.NA)
-            mapping_entries.append(mapping_entry)
-
-        self.reference_mapping = pd.DataFrame(mapping_entries, columns=['domain_index', 'domain_residue', 'protein_residue', 'protein_index'])
-        self.reference_mapping = self.reference_mapping.astype({'domain_index': pd.Int32Dtype(), 'protein_index': pd.Int32Dtype(), 'domain_residue': pd.StringDtype(), 'protein_residue': pd.StringDtype()})
-        reference_mapping_notna = self.reference_mapping.dropna()
-        
-        self.domain_to_protein = dict(zip(reference_mapping_notna.domain_index, reference_mapping_notna.protein_index))
-        self.protein_to_domain = dict(zip(reference_mapping_notna.protein_index, reference_mapping_notna.domain_index))
-
-    def _set_reference_mapping(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str) -> None:
-        """
-        Set values for reference_mapping and mapping dictionaries, domain_to_protein and protein_to_domain.
-
-        Note
-        ----
-        For details on `domain_start`, `protein_start`, `domain_text`, `protein_text`, please refer to the `ResidueAlignment` docstring.
+        domain_start : int
+            The starting index of the domain alignment in the query HMM.
+        protein_start : int
+            The starting index of the domain alignment in the protein target sequence.
+        domain_text : str
+            The sequence of the domain in the query HMM corresponding to this alignment.
+        protein_text : str
+            The sequence of the protein target sequence corresponding to this alignment.
+        valid_residues : list of tuple of int, str, optional
+            List of valid residues, non-missing residues in a structure, in the format of (seq_id, residue_name). These are iteratively selected in the order of the sequence to map to. If None, protein_index is assigned sequentially starting at protein_start instead.
 
         Returns
         -------
         None
         """
-        invalid_chars = [".", "_", "-"]
-        # Convert text to list variant for iteration
-        domain_sequence = list(domain_text)
-        protein_sequence = list(protein_text)
-        # Store mapping values per iteration here.
-        mapping_entries = []
-
-        for domain_aa, protein_aa in zip(domain_sequence, protein_sequence):
-            mapping_entry = []
-            # Check to see if domain residue is valid, if so, we can assign the proper index.
-            if domain_aa not in invalid_chars:
-                mapping_entry.append(domain_start)
-                domain_start += 1
-            else:
-                mapping_entry.append(pd.NA)
-            # Assign the values of the residues mapped together.
-            mapping_entry.append(domain_aa)
-            mapping_entry.append(protein_aa)
-            # Check to see if protein residue is valid, if so, we can assign the proper index.
-            if protein_aa not in invalid_chars:
-                mapping_entry.append(protein_start)
-                protein_start += 1
-            else:
-                mapping_entry.append(pd.NA)
-            # Store the resulting mapping in the reference map.
-            mapping_entries.append(mapping_entry)
-        self.reference_mapping = pd.DataFrame(mapping_entries, columns=['domain_index', 'domain_residue', 'protein_residue', 'protein_index'])
+        self.reference_mapping = pd.DataFrame(
+            self._row_stream(domain_start, protein_start, domain_text, protein_text, valid_residues),
+            columns=['domain_index', 'domain_residue', 'protein_residue', 'protein_index'],
+        )
         self.reference_mapping = self.reference_mapping.astype({'domain_index': pd.Int32Dtype(), 'protein_index': pd.Int32Dtype(), 'domain_residue': pd.StringDtype(), 'protein_residue': pd.StringDtype()})
         reference_mapping_notna = self.reference_mapping.dropna()
-        
+
         self.domain_to_protein = dict(zip(reference_mapping_notna.domain_index, reference_mapping_notna.protein_index))
         self.protein_to_domain = dict(zip(reference_mapping_notna.protein_index, reference_mapping_notna.domain_index))
 
