@@ -8,19 +8,24 @@ from .alignment import ResidueAlignment
 
 class DirectInformationData:
     """
-    Representation and interface for Direct Information data including residue indices for a pair and its corresponding DI value represented as a 3-column ndarray.
+    Representation and interface for Direct Information data including residue indices for a pair and its corresponding DI value, stored as a structured ndarray.
 
     Parameters
     ----------
     structured_ndarray : numpy.ndarray
-        Ndarray with the shape (n,3) with dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float, float)}
+        Structured ndarray of shape (n,), one record per pair, with at least the fields 'residue1' (int), 'residue2' (int), and 'DI' (float). Additional fields are allowed and kept. To build one from a plain (n, 3) ndarray, use load_as_ndarray().
 
     Attributes
     ----------
     DI_data : numpy.ndarray
-        The structured_ndarray in the parameters section where column 1 corresponds to a pair's first residue, column 2 corresponds to the pair's second residue, and column 3 corresponds to the Direct Information of the pair.
+        The structured_ndarray from the parameters section, where 'residue1' is a pair's first residue, 'residue2' is the pair's second residue, and 'DI' is the Direct Information of the pair.
     """
     def __init__(self, structured_ndarray: npt.NDArray) -> None:
+        if structured_ndarray.dtype.names is None:
+            raise ValueError(f"structured_ndarray must be a structured array with residue1/residue2/DI fields, got a plain array with dtype {structured_ndarray.dtype}.")
+        missing = {'residue1', 'residue2', 'DI'} - set(structured_ndarray.dtype.names)
+        if missing:
+            raise ValueError(f"structured_ndarray is missing required fields: {missing}")
         self.DI_data = structured_ndarray
 
     @staticmethod    
@@ -38,7 +43,7 @@ class DirectInformationData:
         DirectInformationData
             DirectInformationData object with named structured array containing residue indices and the DI value of the pair.
         """
-        file_data = np.loadtxt(dca_filepath, dtype={'names': ('residue1', 'residue2', 'MI', 'DI'), 'formats': (int, int, float, float)})
+        file_data = np.loadtxt(dca_filepath, dtype={'names': ('residue1', 'residue2', 'MI', 'DI'), 'formats': (int, int, float, float)}, ndmin=1)
         return DirectInformationData(file_data[['residue1', 'residue2', 'DI']])
 
     @staticmethod
@@ -56,7 +61,7 @@ class DirectInformationData:
         DirectInformationData
             DirectInformationData object with named structured array containing residue indices and the DI value of the pair.
         """
-        return DirectInformationData(np.loadtxt(DI_filepath, dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)}))
+        return DirectInformationData(np.loadtxt(DI_filepath, dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)}, ndmin=1))
 
     @staticmethod
     def load_as_ndarray(ndarray: Union[npt.NDArray, Iterable[Iterable]]) -> 'DirectInformationData':
@@ -74,12 +79,21 @@ class DirectInformationData:
             DirectInformationData object with named structured array containing residue indices and the DI value of the pair.
         """
         
-        if isinstance(ndarray, np.ndarray) and ndarray.shape[1] != 3:
-            raise Exception("Dimensions of numpy array supplied are different from what is expected. Please supply residue1, residue2, and DI column in int, int, float format and with shape of (n, 3).")
-        # Structured ndarrays require list of tuples for conversion.
-        DI_data = np.array([tuple(x) for x in ndarray], dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)})
-        
-        return DirectInformationData(DI_data)
+        if isinstance(ndarray, np.ndarray):
+            if ndarray.dtype.names is not None:
+                raise ValueError("ndarray is a structured numpy array. If this structured array has columns for 'residue1', 'residue2', and 'DI', please use the DirectInformationData constructor directly. Otherwise, please convert to an unstructured numpy array before using this function.")
+            elif ndarray.ndim != 2 or ndarray.shape[1] != 3:
+                raise ValueError(f"Dimensions of numpy array supplied are different from what is expected. Please supply residue1, residue2, and DI column in int, int, float format and with shape of (n, 3), got {ndarray.shape}.")
+            else:
+                DI_data = np.zeros(len(ndarray), dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)})
+                DI_data['residue1'] = ndarray[:, 0]
+                DI_data['residue2'] = ndarray[:, 1]
+                DI_data['DI'] = ndarray[:, 2]
+                return DirectInformationData(DI_data)
+        else:
+            # Structured ndarrays require list of tuples for conversion.
+            DI_data = np.array([tuple(x) for x in ndarray], dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)})
+            return DirectInformationData(DI_data)
     
     def get_ranked_mapped_pairs(self, RA1: ResidueAlignment, RA2: ResidueAlignment, pairs_only: bool=True, mirror: bool=False, number: Optional[int]=None) -> npt.NDArray:
         """
@@ -101,7 +115,7 @@ class DirectInformationData:
         Returns
         -------
         numpy.ndarray
-            Structured ndarray with columns residue 1, residue 2 and optionally DI. Only has specified number of pairs if `number` is specified and mirrored pairs if `mirror` is True and pairs_only is False.
+            Structured ndarray with columns residue 1, residue 2 and optionally DI. Only has specified number of pairs if `number` is specified and mirrored pairs if `mirror` is True and pairs_only is True.
         
         Notes
         -----
@@ -169,7 +183,7 @@ class DirectInformationData:
     @staticmethod
     def nonlocal_pairs(DI_data: npt.NDArray) -> npt.NDArray:
         """
-        Subsets a structured ndarray of pairs information to find nonlocal pairs, where residue interactions are likely not involved in secondary structure formation i.e. helices and sheet interactions. Nonlocal pairs must be at least 4 residues apart.
+        Subsets a structured ndarray of pairs information to find nonlocal pairs, where residue interactions are likely not involved in secondary structure formation i.e. helices and sheet interactions. Nonlocal pairs must be greater than 4 residues apart.
 
         Parameters
         ----------
@@ -179,7 +193,7 @@ class DirectInformationData:
         Returns
         -------
         numpy.ndarray
-            Structured ndarray of DI pairs where residue 1 and residue 2 are at least 4 residues apart.
+            Structured ndarray of DI pairs where residue 1 and residue 2 are greater than 4 residues apart.
         """
         return DI_data[abs(DI_data['residue1'] - DI_data['residue2']) > 4]
     
@@ -192,31 +206,33 @@ class DirectInformationData:
         ----------
         critical_residues_1 : collections.abc.Iterable of int
             Specific residue indices that a DI pair will be compared to. If the first residue of the DI pair is not one of these indices, it will not be appended to results.
-        crtical_residues_2 : collections.abc.Iterable of int
+        critical_residues_2 : collections.abc.Iterable of int
             Specific residue indices that a DI pair will be compared to. If the second residue of the DI pair is not one of these indices, it will not be appended to results.
-        threshold : int, optional
-            Maximum "rank" of the DI pair considered.
+        max_rank : int, optional
+            Maximum "rank", or position by score in descending order when sorted, of the DI pair considered.
         *mapped_resi_arrs : tuple of numpy.ndarray
-            Tuple of ranked, mapped pairs that are compared to critical residue indices and appended to results if in those indices and within threshold.
+            Tuple of ranked, mapped pairs that are compared to critical residue indices and appended to results if in those indices and within max_rank.
         
         Returns
         -------
         results : list of tuple of list of int, int
             Results which consist of tuples where the first element is a list of residue1, residue2, and DI score, whereas the second element is the rank.
         """
+        # max_rank can only be passed positionally (it precedes *mapped_resi_arrs), so catch a mapped array landing in its slot.
+        if max_rank is not None and not isinstance(max_rank, (int, np.integer)):
+            raise TypeError(f"max_rank must be an int or None, got {type(max_rank).__name__}. Pass None for max_rank before the mapped arrays if you don't want a limit.")
+        critical_residues_1 = set(critical_residues_1)
+        critical_residues_2 = set(critical_residues_2)
         results = []
         for mapped_resi_arr in mapped_resi_arrs:
             # count_rank represents the rank of the DI pair being evaluated, iterating over every new row considered.
             count_rank = 0
             for row in mapped_resi_arr:
-                row_as_list = list(row)
                 count_rank += 1
-                if max_rank:
-                    if row_as_list[0] in critical_residues_1 and row_as_list[1] in critical_residues_2 and count_rank <= max_rank:
-                        results.append((row_as_list, count_rank))
-                else:
-                    if row_as_list[0] in critical_residues_1 and row_as_list[1] in critical_residues_2:
-                        results.append((row_as_list, count_rank))
+                if max_rank is not None and count_rank > max_rank:
+                    break
+                if row['residue1'] in critical_residues_1 and row['residue2'] in critical_residues_2:
+                    results.append((list(row), count_rank))
         return results
 
     @staticmethod
@@ -286,6 +302,8 @@ class DirectInformationData:
         -------
         None
         """
-        if len(pairs[0]) == 2:
+        # Count columns from the dtype/shape rather than pairs[0], so an empty pairs ndarray writes an empty file instead of raising.
+        n_columns = len(pairs.dtype.names) if pairs.dtype.names is not None else pairs.shape[1]
+        if n_columns == 2:
             fmt = ('%d', '%d')
         np.savetxt(filepath, pairs, delimiter=delimiter, fmt=fmt)
