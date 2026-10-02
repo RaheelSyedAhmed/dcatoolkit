@@ -20,7 +20,7 @@ class ResidueAlignment:
     protein_text : str
         The sequence of the protein target sequence corresponding to this alignment.
     valid_residues : list of tuple of int, str, optional
-        A list of tuples that contain first residue index then residue name (e.g. [(1, 'A'), (2, 'W'), (3, 'C')]  )
+        A list of tuples that contain first residue index then residue name (e.g. [(1, 'A'), (2, 'W'), (3, 'C')]). If None, this will imply all residues are valid and should be mapped sequentially from protein_start. An empty list of valid residues implies that none of the residues are mapped to each other.
 
     Attributes
     ----------
@@ -70,7 +70,7 @@ class ResidueAlignment:
 
             if protein_aa in ResidueAlignment._INVALID_CHARS:
                 protein_index = pd.NA
-            elif valid_residues:
+            elif valid_residues is not None:
                 protein_index = pd.NA
                 while pointer < len(valid_residues):
                     prot_index, valid_residue = valid_residues[pointer]
@@ -112,11 +112,14 @@ class ResidueAlignment:
         self.reference_mapping = self.reference_mapping.astype({'domain_index': pd.Int32Dtype(), 'protein_index': pd.Int32Dtype(), 'domain_residue': pd.StringDtype(), 'protein_residue': pd.StringDtype()})
         reference_mapping_notna = self.reference_mapping.dropna()
 
-        self.domain_to_protein = dict(zip(reference_mapping_notna.domain_index, reference_mapping_notna.protein_index))
-        self.protein_to_domain = dict(zip(reference_mapping_notna.protein_index, reference_mapping_notna.domain_index))
+        # tolist() gives plain Python ints rather than np.int32 scalars, so the dicts print cleanly and build/look up faster.
+        domain_indices = reference_mapping_notna.domain_index.tolist()
+        protein_indices = reference_mapping_notna.protein_index.tolist()
+        self.domain_to_protein = dict(zip(domain_indices, protein_indices))
+        self.protein_to_domain = dict(zip(protein_indices, domain_indices))
 
     @staticmethod
-    def load_from_align_file(align_filepath: str) -> 'ResidueAlignment':
+    def load_from_align_file(align_filepath: str, valid_residues: Optional[list[tuple[int, str]]]=None) -> 'ResidueAlignment':
         """
         Generate ResidueAlignment from a standard align file generated from HMM scan.
 
@@ -124,11 +127,18 @@ class ResidueAlignment:
         ----------
         align_filepath : str
             Filepath of the align file generated from a scan file produced via hmmscan.
+        valid_residues : list of tuple of int, str, optional
+            A list of tuples that contain first residue index then residue name (e.g. [(1, 'A'), (2, 'W'), (3, 'C')]), passed through to the ResidueAlignment constructor. If None, this will imply all residues are valid and should be mapped sequentially from protein_start. An empty list of valid residues implies that none of the residues are mapped to each other.
 
         Returns
         -------
         ResidueAlignment
             ResidueAlignment with domain and protein starting indices and corresponding sequence texts.
+
+        Raises
+        ------
+        ValueError
+            If the file doesn't contain exactly 2 complete entries of 4 non-blank lines each.
 
         File Format
         -----------
@@ -144,6 +154,8 @@ class ResidueAlignment:
         """
         # Read the alignment file and parse the important information from each alignment entry.
         alignment_entries = ResidueAlignment._read_align_file(align_filepath)
+        if len(alignment_entries) != 2:
+            raise ValueError(f"Expected 2 complete alignment entries (4 non-blank lines each) in {align_filepath}, found {len(alignment_entries)}.")
         hmm_entry, protein_entry = alignment_entries
         domain_name, domain_start, domain_text, _ = hmm_entry
         protein_name, protein_start, protein_text, _ = protein_entry
@@ -152,7 +164,7 @@ class ResidueAlignment:
         domain_start = int(domain_start)
         protein_start = int(protein_start)
 
-        return ResidueAlignment(domain_name, protein_name, domain_start, protein_start, domain_text, protein_text)
+        return ResidueAlignment(domain_name, protein_name, domain_start, protein_start, domain_text, protein_text, valid_residues)
 
     @staticmethod
     def _read_align_file(align_filepath: str) -> list[list[str]]:
@@ -168,6 +180,11 @@ class ResidueAlignment:
         -------
         alignment_entries : list of list of strings
             list of associated lines (one which corresponds to the HMM produced sequence and its indices and one that corresponds to the protein's seqeuence and its indices), which are also contained in a list.
+
+        Raises
+        ------
+        ValueError
+            If the file ends partway through an entry (its non-blank line count isn't a multiple of 4).
         """
         with open(align_filepath, 'r') as fs:
             alignment_entries: list[list[str]] = []
@@ -182,6 +199,9 @@ class ResidueAlignment:
                     line_count = 0
                     alignment_entries.append(current_entry)
                     current_entry: list[str] = []
+        # Leftover lines mean the file ended partway through an entry; don't silently drop them.
+        if current_entry:
+            raise ValueError(f"Incomplete alignment entry at the end of {align_filepath}: expected 4 non-blank lines, found {len(current_entry)} ({current_entry}).")
         return alignment_entries
     
     def __str__(self) -> str:

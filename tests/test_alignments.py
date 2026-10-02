@@ -1,5 +1,6 @@
 from context import ResidueAlignment
 import pandas as pd
+import pytest
 
 test_cases_description = """
 Test Case 1
@@ -85,8 +86,14 @@ def test_residue_alignments():
         answer = list(zip(*test_answers[test_num]))
         assert module_result == answer
 
-# Can handle excess residues, but not missing any ones that are supposed to be there.
-print(ResidueAlignment('name1', 'name2', 1, 1, 'MAAFT', 'MAAFT', valid_residues=[(5, 'M'), (6, 'A'), (7, 'A'), (8, 'R'), (12, 'F')]))
+def test_reference_mapping_restricted_skips_gap_then_exhausts():
+    # Can handle excess residues, but not missing any ones that are supposed to be there.
+    # (8, 'R') doesn't match 'F', so it's skipped and 'F' resyncs on (12, 'F') across the 9-11 structural gap;
+    # 'T' then finds valid_residues exhausted and gets no protein_index.
+    valid_residues = [(5, 'M'), (6, 'A'), (7, 'A'), (8, 'R'), (12, 'F')]
+    ra = ResidueAlignment('name1', 'name2', 1, 1, 'MAAFT', 'MAAFT', valid_residues=valid_residues)
+    assert ra.domain_to_protein == {1: 5, 2: 6, 3: 7, 4: 12}
+    assert pd.isna(ra.reference_mapping.iloc[4]['protein_index'])
 
 def test_reference_mapping_base_case_with_gaps():
     # Gaps on both sides: domain 'C' (2) aligns to a protein gap, protein 'C' (2) aligns to a domain gap.
@@ -94,6 +101,11 @@ def test_reference_mapping_base_case_with_gaps():
     ra = ResidueAlignment('dom', 'prot', 1, 1, 'AC-D', 'A-CD')
     assert ra.domain_to_protein == {1: 1, 3: 3}
     assert ra.protein_to_domain == {1: 1, 3: 3}
+
+def test_mapping_dicts_use_plain_python_ints():
+    ra = ResidueAlignment('dom', 'prot', 1, 300, 'AC', 'AC')
+    for mapping in (ra.domain_to_protein, ra.protein_to_domain):
+        assert all(type(k) is int and type(v) is int for k, v in mapping.items())
 
 def test_reference_mapping_base_case_sequential():
     ra = ResidueAlignment('dom', 'prot', 5, 9, 'ACD', 'ACD')
@@ -121,8 +133,44 @@ def test_reference_mapping_restricted_with_gaps():
     ra = ResidueAlignment('dom', 'prot', 1, 1, 'AC-D', 'A-CD', valid_residues=valid_residues)
     assert ra.domain_to_protein == {1: 1, 3: 3}
 
+def test_reference_mapping_restricted_empty_valid_residues_maps_nothing():
+    # An empty list means no resolved residues, so nothing should map (unlike None, which numbers sequentially).
+    ra = ResidueAlignment('dom', 'prot', 1, 1, 'AC', 'AC', valid_residues=[])
+    assert ra.domain_to_protein == {}
+    assert ra.reference_mapping['protein_index'].isna().all()
+
 def test_reference_mapping_restricted_exhausted_falls_back_to_na():
     # valid_residues runs out before the alignment does; the remaining protein_index values should be NA.
     ra = ResidueAlignment('dom', 'prot', 1, 1, 'AC', 'AC', valid_residues=[(1, 'A')])
     assert ra.domain_to_protein == {1: 1}
     assert pd.isna(ra.reference_mapping.iloc[1]['protein_index'])
+
+ALIGN_TEXT = 'Dom\n1\nAC\n2\n\nProt\n5\nAC\n6\n'
+
+def write_align(tmp_path, text):
+    path = tmp_path / 'test.align'
+    path.write_text(text)
+    return str(path)
+
+def test_load_from_align_file_valid(tmp_path):
+    ra = ResidueAlignment.load_from_align_file(write_align(tmp_path, ALIGN_TEXT))
+    assert ra.domain_to_protein == {1: 5, 2: 6}
+
+def test_load_from_align_file_passes_valid_residues(tmp_path):
+    # ALIGN_TEXT's protein side is 'AC' starting at 5; (6, 'X') isn't in the text, so it's skipped and 'C' resyncs on (7, 'C').
+    valid_residues = [(1, 'Z'), (2, 'Z'), (3, 'Z'), (4, 'Z'), (5, 'A'), (6, 'X'), (7, 'C')]
+    ra = ResidueAlignment.load_from_align_file(write_align(tmp_path, ALIGN_TEXT), valid_residues=valid_residues)
+    assert ra.domain_to_protein == {1: 5, 2: 7}
+
+def test_load_from_align_file_rejects_extra_entry(tmp_path):
+    with pytest.raises(ValueError, match='Expected 2 complete alignment entries'):
+        ResidueAlignment.load_from_align_file(write_align(tmp_path, ALIGN_TEXT + '\nExtra\n1\nAC\n2\n'))
+
+def test_load_from_align_file_rejects_truncated_entry(tmp_path):
+    with pytest.raises(ValueError, match='Incomplete alignment entry'):
+        ResidueAlignment.load_from_align_file(write_align(tmp_path, 'Dom\n1\nAC\n2\n\nProt\n5\nAC\n'))
+
+def test_load_from_align_file_rejects_trailing_partial_entry(tmp_path):
+    # Two complete entries plus leftover lines used to load silently, ignoring the leftovers.
+    with pytest.raises(ValueError, match='Incomplete alignment entry'):
+        ResidueAlignment.load_from_align_file(write_align(tmp_path, ALIGN_TEXT + '\nExtra\n1\n'))
