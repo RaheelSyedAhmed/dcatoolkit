@@ -142,7 +142,7 @@ class MMCIFInformation(StructureInformation):
 
     Attributes
     ----------
-    self.full_sequences : dict of str, biotite.sequence.ProteinSequence
+    self.full_sequences : dict of str, str
         The full protein sequences from the pdbx file used to generate the structure stored in a dictionary where auth_chain_id is the key and the ProteinSequence object is the value.
     self.non_missing_sequences : dict of str, biotite.sequence.ProteinSequence
         The protein sequences, without missing residues, compiled in the structure of the StructureInformation instance stored in a dictionary where chain_id is the key and the sequence string is the value.
@@ -163,10 +163,62 @@ class MMCIFInformation(StructureInformation):
         self.structure = structure
         self.pdbx_file = pdbx_file
         self.model_num = model_num
-        self.full_sequences = pdbx.get_sequence(pdbx_file)
+        self.full_sequences = self._read_full_sequences(pdbx_file)
         non_hetero_structure = self.structure[self.structure.hetero == False]
         self.non_missing_sequences = {str(chain): str(sequence) for (chain, sequence) in list(zip(struc.get_chains(non_hetero_structure), struc.to_sequence(non_hetero_structure)[0]))}
         self._generate_auth_info()
+
+    def _read_full_sequences(self, pdbx_file: pdbx.CIFFile) -> dict[str, str]:
+        """
+        Full chain sequences from entity_poly, falling back to entity_poly_seq when the one-letter column is absent (e.g. AlphaFold3 output).
+        
+        Parameters
+        ----------
+        pdbx_file: biotite.io.pdbx.CIFFile
+            mmCIF file that contains generic information and atomic information of the protein structure categorized into mmCIF blocks.
+
+        Returns
+        -------
+        dict of str, str
+            Dictionary where the key is the auth chain identifier and the value is the full sequence, including missing residues, making up the chain's structure.
+        """
+
+        try:
+            return {chain: str(seq) for chain, seq in pdbx.get_sequence(pdbx_file).items()}
+        except KeyError:
+            # Some writers (e.g. AlphaFold3) omit entity_poly.pdbx_seq_one_letter_code_can, which get_sequence() needs.
+            # Rebuild the same {auth chain id: one-letter sequence} dictionary from entity_poly_seq instead.
+            block = pdbx_file.block
+            entity_poly = block["entity_poly"]
+            # Only protein entities; entity_poly can also list nucleic acids.
+            protein_entities = {entity_id for entity_id, entity_type in zip(entity_poly["entity_id"].as_array(str), entity_poly["type"].as_array(str)) if entity_type.startswith("polypeptide")}
+
+            # entity_poly_seq has one row per residue: (entity_id, num, mon_id).
+            entity_poly_seq = block["entity_poly_seq"]
+            entity_residues: dict[str, dict[int, str]] = {}
+            for entity_id, num, residue_name in zip(entity_poly_seq["entity_id"].as_array(str), entity_poly_seq["num"].as_array(int), entity_poly_seq["mon_id"].as_array(str)):
+                if entity_id in protein_entities:
+                    # Microheterogeneity can list several residues at the same num; keep the first.
+                    entity_residues.setdefault(entity_id, {}).setdefault(num, residue_name)
+
+            entity_sequences: dict[str, str] = {}
+            for entity_id, residues in entity_residues.items():
+                letters = []
+                for num in sorted(residues):
+                    try:
+                        letters.append(ProteinSequence.convert_letter_3to1(residues[num]))
+                    except KeyError:
+                        # Residue names biotite doesn't know become 'X'.
+                        letters.append("X")
+                entity_sequences[entity_id] = "".join(letters)
+
+            # pdbx_strand_id lists the auth chain ids of every copy of an entity, comma-separated (e.g. "A,B" for a homodimer).
+            full_sequences: dict[str, str] = {}
+            for entity_id, strand_ids in zip(entity_poly["entity_id"].as_array(str), entity_poly["pdbx_strand_id"].as_array(str)):
+                if entity_id in entity_sequences:
+                    for chain in strand_ids.split(","):
+                        full_sequences[chain] = entity_sequences[entity_id]
+            return full_sequences
 
     def _generate_auth_info(self) -> None:
         """

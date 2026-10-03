@@ -21,3 +21,17 @@ def test_get_start_res_id_every_chain(hqz):
     for chain in hqz.unique_chains:
         expected = hqz.get_chain_specific_structure(ca_only=False, chain_id=chain).res_id[0]
         assert hqz.get_start_res_id(chain) == expected
+
+def test_alphafold3_model_loads_full_sequences():
+    # AlphaFold3 mmCIF output has no entity_poly.pdbx_seq_one_letter_code_can, so full sequences come from entity_poly_seq.
+    af3 = MMCIFInformation.read_mmCIF_file("examples/files/fold_cry1ab_ec12_model_0.cif")
+    assert len(af3.get_full_sequence('A')) == 607
+    assert af3.get_full_sequence('A').startswith("MDNNPNINECIP")
+    assert len(af3.get_full_sequence('B')) == 112
+
+def test_full_sequence_fallback_matches_get_sequence(hqz):
+    # Forcing the fallback on an RCSB file should rebuild exactly what biotite's get_sequence returns.
+    import biotite.structure.io.pdbx as pdbx
+    pdbx_file = pdbx.CIFFile.read("tests/pdb_info/1hqz.cif")
+    del pdbx_file.block["entity_poly"]["pdbx_seq_one_letter_code_can"]
+    assert hqz._read_full_sequences(pdbx_file) == hqz.full_sequences
