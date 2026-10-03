@@ -198,7 +198,7 @@ class DirectInformationData:
         return DI_data[abs(DI_data['residue1'] - DI_data['residue2']) > 4]
     
     @staticmethod
-    def find_DI_with_residues(critical_residues_1 : Iterable[int], critical_residues_2 : Iterable[int], max_rank: Optional[int]=None, *mapped_resi_arrs: Iterable[npt.NDArray]) -> list[tuple[list, int]]:
+    def find_DI_with_residues(critical_residues_1 : Iterable[int], critical_residues_2 : Iterable[int], *mapped_resi_arrs: npt.NDArray, max_rank: Optional[int]=None) -> list[tuple[list, int]]:
         """
         Function that takes an n number of ranked, mapped DI pairs and checks to see if they're in a list of potential residue indices.
         
