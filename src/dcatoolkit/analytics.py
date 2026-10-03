@@ -50,6 +50,8 @@ class MSATools:
             data = msa_source.read()
         else:
             raise TypeError("msa_file is not bytesIO, a TextIO, or a filepath.")
+
+        data = data.replace("\r\n", "\n").replace("\r", "\n")
         split_data = data.split(">")[1:]
         for entry in split_data:
             header, _, rest = entry.partition("\n")
