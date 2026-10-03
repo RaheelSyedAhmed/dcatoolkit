@@ -72,20 +72,20 @@ def test_map_dis_correctly_maps_residues():
 
 def test_find_di_with_residues_no_max_rank():
     arr = np.array([(i, i + 1, 1.0 - i * 0.01) for i in range(10)], dtype=DI_DTYPE)
-    results = DirectInformationData.find_DI_with_residues(list(range(10)), list(range(1, 11)), None, arr)
+    results = DirectInformationData.find_DI_with_residues(list(range(10)), list(range(1, 11)), arr)
     assert len(results) == 10
     assert all(rank == i + 1 for i, (_, rank) in enumerate(results))
 
 def test_find_di_with_residues_max_rank_stops_early():
     arr = np.array([(i, i + 1, 1.0 - i * 0.01) for i in range(20)], dtype=DI_DTYPE)
-    results = DirectInformationData.find_DI_with_residues(list(range(20)), list(range(1, 21)), 5, arr)
+    results = DirectInformationData.find_DI_with_residues(list(range(20)), list(range(1, 21)), arr, max_rank=5)
     assert len(results) == 5
     assert all(rank <= 5 for _, rank in results)
 
 def test_find_di_with_residues_multiple_arrays_reset_rank():
     arr1 = np.array([(1, 2, 0.9)], dtype=DI_DTYPE)
     arr2 = np.array([(100, 101, 0.5)], dtype=DI_DTYPE)
-    results = DirectInformationData.find_DI_with_residues([1, 100], [2, 101], None, arr1, arr2)
+    results = DirectInformationData.find_DI_with_residues([1, 100], [2, 101], arr1, arr2)
     assert [rank for _, rank in results] == [1, 1]
 
 
@@ -115,18 +115,18 @@ def test_write_DI_data_pairs_only_uses_int_format(tmp_path):
     DirectInformationData.write_DI_data(str(path), arr[['residue1', 'residue2']])
     assert path.read_text().split() == ['1', '10', '2', '20']
 
-def test_find_di_with_residues_rejects_array_as_max_rank():
-    # Forgetting max_rank shifts the first mapped array into its slot; that should fail loudly.
+def test_find_di_with_residues_rejects_positional_max_rank():
+    # max_rank is keyword-only; the old positional call style should fail loudly instead of treating 300 as an array.
     arr = np.array([(1, 2, 0.9)], dtype=DI_DTYPE)
-    with pytest.raises(TypeError):
-        DirectInformationData.find_DI_with_residues([1], [2], arr)
+    with pytest.raises(TypeError, match="max_rank is keyword-only"):
+        DirectInformationData.find_DI_with_residues([1], [2], 300, arr)  # type: ignore[arg-type]  # deliberately wrong call style
 
 def test_find_di_with_residues_max_rank_zero_returns_nothing():
     arr = np.array([(1, 2, 0.9)], dtype=DI_DTYPE)
-    assert DirectInformationData.find_DI_with_residues([1], [2], 0, arr) == []
+    assert DirectInformationData.find_DI_with_residues([1], [2], arr, max_rank=0) == []
 
 def test_find_di_with_residues_uses_field_names_not_positions():
     # DI first: positional row[0] would be the DI score, so matching must go by field name.
     odd = np.array([(0.9, 1, 2)], dtype=[('DI', float), ('residue1', int), ('residue2', int)])
-    results = DirectInformationData.find_DI_with_residues([1], [2], None, odd)
+    results = DirectInformationData.find_DI_with_residues([1], [2], odd)
     assert [rank for _, rank in results] == [1]
