@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cdist
+from scipy.spatial import KDTree
 
 import biotite.structure as struc
 import biotite.structure.io.pdbx as pdbx
@@ -222,9 +223,9 @@ class MMCIFInformation(StructureInformation):
         else:
             chain_df = self.atom_df[self.atom_df['label_asym_id'] == chain_id]
         if get_auth_res_ids:
-            return chain_df['auth_seq_id'][0]
+            return chain_df['auth_seq_id'].iloc[0]
         else:
-            return chain_df['label_seq_id'][0]
+            return chain_df['label_seq_id'].iloc[0]
 
     def get_full_sequence(self, chain_id: str, auth_chain_id_supplied: bool=False) -> str:
         """
@@ -425,6 +426,9 @@ class MMCIFInformation(StructureInformation):
         """
         chain1_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain1, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
         chain2_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        # Generate the auth ids of the residues in the pairs ndarray
+        seq_mapping_chain1 = self.get_seq_id_mapping(chain_id=chain1, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        seq_mapping_chain2 = self.get_seq_id_mapping(chain_id=chain2, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
         min_dist_pairs_atoms = []
         for row in pairs:
             # Obtain structure information for chains 1 and 2
@@ -436,9 +440,6 @@ class MMCIFInformation(StructureInformation):
             
             ind = np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
             # Use the indices to access the atom in the atom array and get the correct atom name.
-            # Generate the auth ids of the residues in the pairs ndarray
-            seq_mapping_chain1 = self.get_seq_id_mapping(chain_id=chain1, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
-            seq_mapping_chain2 = self.get_seq_id_mapping(chain_id=chain2, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
             auth_res_id1 = seq_mapping_chain1[row['residue1']]
             auth_res_id2 = seq_mapping_chain2[row['residue2']]
             min_dist_pairs_atoms.append((row['residue1'], row['residue2'], auth_res_id1, auth_res_id2, chain1_res1_structure[ind[0]].atom_name, chain2_res2_structure[ind[1]].atom_name))
@@ -469,21 +470,28 @@ class MMCIFInformation(StructureInformation):
         contacts_set : set of tuple of ints
             Set of contacts, tuples with "residue1" and "residue2" from the structure that are within the distance threshold.
         """
-        chain1_structure, chain2_structure, dist_matrix = self.generate_dist_matrix(ca_only, chain1, chain2, auth_chain_id_supplied=auth_chain_id_supplied)
-        seq_mapping_chain1 = self.get_seq_id_mapping(chain_id=chain1, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
-        seq_mapping_chain2 = self.get_seq_id_mapping(chain_id=chain2, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
-        thresh_ind = np.argwhere(dist_matrix <= threshold)
-        contacts_set = set()
-        for indices in thresh_ind:
-            chain1_atom = chain1_structure[indices[0]]
-            chain2_atom = chain2_structure[indices[1]]
-            res1 = chain1_atom.res_id
-            res2 = chain2_atom.res_id
-            if not(chain1==chain2 and res1 >= res2):
-                if auth_seq_id:
-                    contacts_set.add((seq_mapping_chain1[res1], seq_mapping_chain2[res2]))
-                else:
-                    contacts_set.add((res1, res2))
+        # Get chain1 and chain2 structures.
+        chain1_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain1, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        chain2_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
+        # Find the atomic positions where the prior atom is within or equal to the threshold distance of its pair.
+        # KD-trees only compare nearby atoms, so the full chain1 x chain2 distance matrix is never built.
+        close_pairs = KDTree(chain1_structure.coord).sparse_distance_matrix(KDTree(chain2_structure.coord), threshold, output_type="ndarray")
+        # Residue ids of atom positions within threshold distance.
+        res1_ids_within_threshold = chain1_structure.res_id[close_pairs["i"]]
+        res2_ids_within_threshold = chain2_structure.res_id[close_pairs["j"]]
+        
+        if chain1 == chain2:
+            # Setup indices where res1 is not the same as res2 ever. Eliminates self-contact and mirrored contacts.
+            upper_triangle = res1_ids_within_threshold < res2_ids_within_threshold
+            res1_ids_within_threshold, res2_ids_within_threshold = res1_ids_within_threshold[upper_triangle], res2_ids_within_threshold[upper_triangle]
+        # Sets allow us to store unique contacts only.
+        contacts_set = set(zip(res1_ids_within_threshold.tolist(), res2_ids_within_threshold.tolist()))
+        if auth_seq_id:
+            # Set up maps for label residue id to auth residue id.
+            seq_mapping_chain1 = self.get_seq_id_mapping(chain_id=chain1, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+            seq_mapping_chain2 = self.get_seq_id_mapping(chain_id=chain2, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
+            # Use maps to have finalized residue ids present.
+            contacts_set = {(seq_mapping_chain1[r1], seq_mapping_chain2[r2]) for r1, r2 in contacts_set}
         return contacts_set
 
 class PDBInformation(StructureInformation):
@@ -673,15 +681,18 @@ class PDBInformation(StructureInformation):
         contacts_set : set of tuple of ints
             Set of contacts, tuples with "residue1" and "residue2" from the structure that are within the distance threshold.
         """
-        
-        chain1_structure, chain2_structure, dist_matrix = self.generate_dist_matrix(ca_only, chain1, chain2)
-        thresh_ind = np.argwhere(dist_matrix <= threshold)
-        contacts_set = set()
-        for indices in thresh_ind:
-            chain1_atom = chain1_structure[indices[0]]
-            chain2_atom = chain2_structure[indices[1]]
-            res1 = chain1_atom.res_id
-            res2 = chain2_atom.res_id
-            if not(chain1==chain2 and res1 >= res2):
-                contacts_set.add((res1, res2))
-        return contacts_set
+        # Get chain1 and chain2 structures.
+        chain1_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain1, remove_hetero=True)
+        chain2_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain2, remove_hetero=True)
+        # Find the atomic positions where the prior atom is within or equal to the threshold distance of its pair.
+        close_pairs = KDTree(chain1_structure.coord).sparse_distance_matrix(KDTree(chain2_structure.coord), threshold, output_type="ndarray")
+        # Residue ids of atom positions within threshold distance.
+        res1_ids_within_threshold = chain1_structure.res_id[close_pairs["i"]]
+        res2_ids_within_threshold = chain2_structure.res_id[close_pairs["j"]]
+
+        if chain1 == chain2:
+            # Setup indices where res1 is not the same as res2 ever. Eliminates self-contact and mirrored contacts.
+            upper_triangle = res1_ids_within_threshold < res2_ids_within_threshold
+            res1_ids_within_threshold, res2_ids_within_threshold = res1_ids_within_threshold[upper_triangle], res2_ids_within_threshold[upper_triangle]
+        # Sets allow us to store unique contacts only.
+        return set(zip(res1_ids_within_threshold.tolist(), res2_ids_within_threshold.tolist()))
