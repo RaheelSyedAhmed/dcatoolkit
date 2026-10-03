@@ -15,8 +15,13 @@ class MSATools:
 
     Parameters
     ----------
-    MSA : list of tuple of str, str
-        Loaded MSA that is a list of tuples where the first element is the header and the second element is its corresponding sequence.
+    MSA : list of tuple of (str, str)
+        Loaded MSA that is a list of tuples where the first element is the header (including its leading ``">"``) and the second element is its corresponding sequence.
+
+    Attributes
+    ----------
+    MSA : list of tuple of (str, str)
+        The `MSA` supplied.
     """
     _GAP_CLEANUP_TABLE = str.maketrans('', '', string.ascii_lowercase + ".")
 
@@ -26,17 +31,26 @@ class MSATools:
     @staticmethod
     def load_from_file(msa_source: Union[str, io.IOBase, Path]) -> 'MSATools':
         """
-        Generates MSATools object from an MSA file in ".afa" format.
+        Generates MSATools object from an MSA file in aligned FASTA (``.afa``) format.
 
         Parameters
         ----------
-        msa_source : str or io.IOBase or pathlib.Path
-            Filepath or IOBase of the MSA in ".afa" format that is provided.
-        
+        msa_source : str or pathlib.Path or io.BytesIO or io.TextIOBase
+            Filepath, or in-memory bytes or text stream, of the MSA in ``.afa`` format. Streams are read from the beginning.
+
         Returns
         -------
         MSATools
-            An MSATools instance with the appropriate list of (header, sequence) tuples where sequences are simplified and converted to single line format.
+            An MSATools instance with the appropriate list of ``(header, sequence)`` tuples where sequences are simplified and converted to single line format.
+
+        Raises
+        ------
+        TypeError
+            If `msa_source` is not a filepath, ``io.BytesIO``, or ``io.TextIOBase``.
+
+        Notes
+        -----
+        Windows (``\\r\\n``) and old Mac (``\\r``) line endings are normalized to ``\\n`` before parsing. Headers keep their leading ``">"``.
         """
         data = ""
         msa_entries: list[tuple[str, str]] = []
@@ -67,23 +81,32 @@ class MSATools:
         Parameters
         ----------
         sequence : str
-            Sequence of characters, potentially containing multiple of '-', a gap character.
-        
+            Sequence of characters, potentially containing multiple of ``"-"``, a gap character.
+
         Returns
         -------
         int
-            The maximum number of continuous gaps in a sequence.
+            The maximum number of continuous gaps (``"-"``) in a sequence, or 0 if there are none. Other characters, such as ``"."``, break a run of gaps.
         """
         return max((m.end() - m.start() for m in re.finditer(r"-+", sequence)), default=0)
     
     def gap_frequency(self) -> tuple[dict[int, int], dict[int, float]]:
         """
-        Calculates the frequency of maximum continuous gaps throughout the MSA where the key corresponds to the number of continous gaps and the value corresponds to the number of sequences or the cumulative percentage of their sequences.
+        Calculates the frequency of maximum continuous gaps throughout the MSA where the key corresponds to the number of continuous gaps and the value corresponds to the number of sequences or the cumulative fraction of sequences.
 
         Returns
         -------
-        tuple of dict of int, int and dict of int, int
-            Two element tuple where first element is a frequency count dictionary and the second element is a cumulative percentage of sequences with a specific maximum number of continous gaps.
+        tuple of (dict of {int : int}, dict of {int : float})
+            Two element tuple where the first element maps each maximum continuous gap length to the number of sequences with it, and the second element maps it to the cumulative fraction (0 to 1) of sequences with that maximum or fewer.
+
+        See Also
+        --------
+        get_sequence_max_cont_gaps : Computes each sequence's maximum continuous gap length.
+        filter_by_continuous_gaps : Filters sequences by that length.
+
+        Notes
+        -----
+        Gaps are counted on the sequences as stored. To match the counts `filter_by_continuous_gaps()` uses, run this on an already filtered MSA, e.g. ``MSATools(msa.filter_by_continuous_gaps()).gap_frequency()``.
         """
         max_gap_counts = []
         for header, sequence in self.MSA:
@@ -99,17 +122,21 @@ class MSATools:
     
     def filter_by_continuous_gaps(self, max_gaps: Optional[int]=None) -> list[tuple[str, str]]:
         """
-        Filter out entries in your MSA by the number of maximum continuous gaps specified unless None is provided. Also, removes .s and lowercase letters from the sequence.
+        Filter out entries in your MSA by the number of maximum continuous gaps specified unless None is provided. Also, removes ``"."`` characters and lowercase letters (insert positions) from the sequence.
 
         Parameters
         ----------
-        max_gaps : int
-            The maximum allowed number of continuous gaps in a sequence
+        max_gaps : int, optional
+            The maximum allowed number of continuous gaps in a sequence. If None, no entries are removed, but sequences are still cleaned.
 
         Returns
         -------
-        list of tuple of str, str
-            List of entries that are valid in that their sequences' number of maximum continuous gaps is within the threshold supplied as `max_gaps`. 
+        list of tuple of (str, str)
+            List of entries that are valid in that their sequences' number of maximum continuous gaps is within the threshold supplied as `max_gaps`. Wrap it in ``MSATools(...)`` to keep working with it as an MSA.
+
+        Notes
+        -----
+        Insert characters are removed before gaps are counted, so gap runs that were separated only by ``"."`` or lowercase letters count as one run.
         """
         kept_entries = []
         for header, sequence in self.MSA:
@@ -120,19 +147,23 @@ class MSATools:
 
     def gap_proportion(self, agg_func: Callable[..., float | int]=np.mean, axis: Literal[0, 1] = 0) -> float | int:
         """
-        Evaluates gap frequency per alignment position, or column, in the MSA.
+        Evaluates the gap proportion per alignment position (column) or per sequence (row) in the MSA, then aggregates it into one value.
 
         Parameters
         ----------
-        agg_func: function = np.mean
-            The aggregation function applied to get the expected result, usually a mean, max, or min value, of the gap frequencies present per alignment position in the MSA.
-        axis: Literal[0, 1]
-            When axis is 0, the aggregation function is applied per column for entries from every row in that column. When axis is 1, the aggregation function is applied per row for entries from every column in that row.
-        
-        Return
-        ------
-        float
-            A numerical value determined by the aggregation function supplied over the gap frequencies of the alignment positions in the MSA.
+        agg_func : callable, default numpy.mean
+            The aggregation function applied to get the expected result, usually a mean, max, or min value, of the gap proportions.
+        axis : {0, 1}, default 0
+            When `axis` is 0, gap proportions are computed per column, over every sequence in that column. When `axis` is 1, they are computed per row, over every column in that sequence.
+
+        Returns
+        -------
+        float or int
+            A numerical value determined by `agg_func` over the gap proportions.
+
+        Notes
+        -----
+        Any character that is not an ASCII letter (e.g. ``"-"`` or ``"."``) counts as a gap. All sequences must have the same length, as in an unfiltered or a filtered MSA.
         """
         num_rows = len(self.MSA)
         num_cols = len(self.MSA[0][1])
@@ -143,16 +174,17 @@ class MSATools:
 
     def write(self, destination: Union[str, Path, io.TextIOBase]) -> None:
         """
-        Writes this MSA's headers and sequences to the destination specified.
-        
+        Writes this MSA's headers and sequences to the destination specified, each header followed by its sequence on a single line.
+
         Parameters
         ----------
         destination : str or pathlib.Path or io.TextIOBase
-            Filepath or TextIO object to write the MSA supplied to.
+            Filepath or writable text stream to write the MSA to.
 
-        Returns
-        -------
-        None
+        Raises
+        ------
+        TypeError
+            If `destination` is not a filepath or a writable ``io.TextIOBase``.
         """
         if isinstance(destination, (str, Path)):
             file_context = open(destination, 'w')
@@ -170,8 +202,8 @@ class MSATools:
 
         Returns
         -------
-        npt.NDArray
-            A matrix of "number of sequences" rows and "number of alignment positions" columns. Each cell is the sequence character for that sequence at that position.
+        numpy.ndarray
+            A ``<U1`` (one-character string) matrix with one row per sequence and one column per alignment position. Each cell is the sequence character for that sequence at that position.
         """
         return np.array([list(seq) for _, seq in self.MSA])
 
@@ -193,6 +225,6 @@ class MSATools:
         Returns
         -------
         int
-            length of the MSA list of header, sequence tuples.
+            Length of the MSA list of ``(header, sequence)`` tuples.
         """
         return len(self.MSA)

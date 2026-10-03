@@ -13,12 +13,17 @@ class DirectInformationData:
     Parameters
     ----------
     structured_ndarray : numpy.ndarray
-        Structured ndarray of shape (n,), one record per pair, with at least the fields 'residue1' (int), 'residue2' (int), and 'DI' (float). Additional fields are allowed and kept. To build one from a plain (n, 3) ndarray, use load_as_ndarray().
+        Structured ndarray of shape ``(n,)``, one record per pair, with at least the fields ``residue1`` (int), ``residue2`` (int), and ``DI`` (float). Additional fields are allowed and kept. To build one from a plain ``(n, 3)`` ndarray, use `load_as_ndarray()`.
 
     Attributes
     ----------
     DI_data : numpy.ndarray
-        The structured_ndarray from the parameters section, where 'residue1' is a pair's first residue, 'residue2' is the pair's second residue, and 'DI' is the Direct Information of the pair.
+        The `structured_ndarray` from the parameters section, where ``residue1`` is a pair's first residue, ``residue2`` is the pair's second residue, and ``DI`` is the Direct Information of the pair.
+
+    Raises
+    ------
+    ValueError
+        If `structured_ndarray` is not a structured ndarray or lacks any of the ``residue1``, ``residue2``, or ``DI`` fields.
     """
     def __init__(self, structured_ndarray: npt.NDArray) -> None:
         if structured_ndarray.dtype.names is None:
@@ -31,7 +36,7 @@ class DirectInformationData:
     @staticmethod    
     def load_from_dca_output(dca_filepath: str) -> 'DirectInformationData':
         """
-        Function to generate a DirectInformationData object from the direct output of the MATLab dca function.
+        Function to generate a DirectInformationData object from the direct output of the MATLAB dca function.
 
         Parameters
         ----------
@@ -41,7 +46,7 @@ class DirectInformationData:
         Returns
         -------
         DirectInformationData
-            DirectInformationData object with named structured array containing residue indices and the DI value of the pair.
+            DirectInformationData object with a structured ndarray containing the ``residue1``, ``residue2``, and ``DI`` fields.
         """
         file_data = np.loadtxt(dca_filepath, dtype={'names': ('residue1', 'residue2', 'MI', 'DI'), 'formats': (int, int, float, float)}, ndmin=1)
         return DirectInformationData(file_data[['residue1', 'residue2', 'DI']])
@@ -49,34 +54,39 @@ class DirectInformationData:
     @staticmethod
     def load_from_DI_file(DI_filepath: str) -> 'DirectInformationData':
         """
-        Function to generate a DirectInformationData object from the modified DI-only version of the DCA output generated via the MATLab dca function.
+        Function to generate a DirectInformationData object from the modified DI-only version of the DCA output generated via the MATLAB dca function.
 
         Parameters
         ----------
         DI_filepath : str
-            Filepath of the DI file to be read and compile into a structured ndarray. DI file is a 3 column text file with the following columns: (residue 1, residue 2, Direct Information).
+            Filepath of the DI file to be read and compiled into a structured ndarray. DI file is a 3 column text file with the following columns: (residue 1, residue 2, Direct Information).
         
         Returns
         -------
         DirectInformationData
-            DirectInformationData object with named structured array containing residue indices and the DI value of the pair.
+            DirectInformationData object with a structured ndarray containing the ``residue1``, ``residue2``, and ``DI`` fields.
         """
         return DirectInformationData(np.loadtxt(DI_filepath, dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)}, ndmin=1))
 
     @staticmethod
     def load_as_ndarray(ndarray: Union[npt.NDArray, Iterable[Iterable]]) -> 'DirectInformationData':
         """
-        Function to generate a Direct Information object from a ndarray.
+        Function to generate DirectInformationData from a plain ndarray or an iterable of pairs.
 
         Parameters
         ----------
         ndarray : numpy.ndarray or Iterable of Iterable (excluding dict)
-            An ndarray of shape (n,3) where its columns are (residue 1, residue 2, and Direct Information). Can also be parsed from an iterable of iterable provided that the aforementioned format is followed.
+            A plain ndarray of shape ``(n, 3)`` whose columns are residue 1, residue 2, and Direct Information. Can also be parsed from an iterable of iterables, each with exactly those three values.
 
         Returns
         -------
         DirectInformationData
-            DirectInformationData object with named structured array containing residue indices and the DI value of the pair.
+            DirectInformationData object with a structured ndarray containing the ``residue1``, ``residue2``, and ``DI`` fields.
+
+        Raises
+        ------
+        ValueError
+            If `ndarray` is a structured ndarray (use the DirectInformationData constructor instead), or a plain ndarray that is not 2D with exactly 3 columns.
         """
         
         if isinstance(ndarray, np.ndarray):
@@ -97,7 +107,7 @@ class DirectInformationData:
     
     def get_ranked_mapped_pairs(self, RA1: ResidueAlignment, RA2: ResidueAlignment, pairs_only: bool=True, mirror: bool=False, number: Optional[int]=None) -> npt.NDArray:
         """
-        Uses DirectInformationData and Pairs interface methods to obtain ranked, mapped residues. See rank_pairs() function and map_DIs() function for details on rank and mapping. Residue Alignments can be the same for intra-domain / intra-protein mapping.
+        Uses DirectInformationData and Pairs interface methods to obtain ranked, mapped residues that are further than 4 residues apart. Residue Alignments can be the same for intra-domain / intra-protein mapping.
 
         Parameters
         ----------
@@ -105,21 +115,27 @@ class DirectInformationData:
             The ResidueAlignment used for mapping the first column of residues to the appropriate target sequence.
         RA2 : ResidueAlignment
             The ResidueAlignment used for mapping the second column of residues to the appropriate target sequence.
-        pairs_only : bool
-            True if the final ndarray should contain only columns 1 and 2, corresponding to the residues that constitute the pair. This would drop the DI column.
-        mirror : bool
-            See Pairs.mirror_pairs() or get_pairs() for details. NOTE: This option is overriden entirely if pairs_only is False. If true, this will produce an ndarray that has the original residue indices and repeated residue indices but with residue 1 and residue 2 switched. This is useful for plotting across the upper diagonal of a contact map.
-        number : int, None
-            Number of ranked, mapped pairs to return.
+        pairs_only : bool, default True
+            If True, the final ndarray contains only the ``residue1`` and ``residue2`` fields, dropping the ``DI`` field.
+        mirror : bool, default False
+            If True, the original pairs are followed by the same pairs with residue 1 and residue 2 switched, which is useful for plotting across the upper diagonal of a contact map. Ignored if `pairs_only` is False. See `Pairs.get_pairs()` for details.
+        number : int, optional
+            Number of ranked, mapped pairs to return. If None, all pairs are returned.
 
         Returns
         -------
         numpy.ndarray
-            Structured ndarray with columns residue 1, residue 2 and optionally DI. Only has specified number of pairs if `number` is specified and mirrored pairs if `mirror` is True and pairs_only is True.
-        
+            Structured ndarray with the ``residue1`` and ``residue2`` fields, plus ``DI`` if `pairs_only` is False. Only has `number` pairs if `number` is specified, and mirrored pairs if `mirror` and `pairs_only` are both True.
+
+        See Also
+        --------
+        nonlocal_pairs : Removes pairs within 4 residues of each other.
+        rank_pairs : Ranks pairs by DI in descending order.
+        map_DIs : Maps residues through the ResidueAlignments.
+
         Notes
         -----
-        ResidueAlignments contain dictionaries like domain_to_protein to map residues produced via Direct Coupling Analysis (DCA) on an MSA generated in context to an HMM. The residues are mapped to a protein structure via alignment of the HMM hit / domain to the protein sequence.
+        ResidueAlignments contain dictionaries like ``domain_to_protein`` to map residues produced via Direct Coupling Analysis (DCA) on an MSA generated in context to an HMM. The residues are mapped to a protein structure via alignment of the HMM hit / domain to the protein sequence.
         """
         ranked_pairs = DirectInformationData.rank_pairs(DirectInformationData.nonlocal_pairs(self.DI_data))
         ranked_mapped_pairs = DirectInformationData.map_DIs(ranked_pairs, RA1, RA2)
@@ -131,12 +147,12 @@ class DirectInformationData:
     @staticmethod
     def map_DIs(DI_data : npt.NDArray, RA1: ResidueAlignment, RA2: ResidueAlignment) -> npt.NDArray:
         """
-        Uses domain-to-protein mappings present in the Residue Alignments provided to generate mapped representations of the residues from the DI_data structured ndarray provided.
+        Uses domain-to-protein mappings present in the Residue Alignments provided to generate mapped representations of the residues from the `DI_data` structured ndarray provided.
 
         Parameters
         ----------
         DI_data : numpy.ndarray
-            Structured ndarray that contains columns "residue1" and "residue2".
+            Structured ndarray that contains the ``residue1`` and ``residue2`` fields.
         RA1 : ResidueAlignment
             The ResidueAlignment used for mapping the first column of residues to the appropriate target sequence.
         RA2 : ResidueAlignment
@@ -145,12 +161,12 @@ class DirectInformationData:
         Returns
         -------
         mappable_DI_data : numpy.ndarray
-            DI_data that has been mapped to the target sequence specified in the generation of the corresponding ResidueAlignments.
+            `DI_data` that has been mapped to the target sequence specified in the generation of the corresponding ResidueAlignments. Other fields (e.g. ``DI``) are kept.
 
-        Note:
-            Residues that do not map to the target sequence of the ResidueAlignment are dropped.
+        Notes
+        -----
+        Residues that do not map to the target sequence of the ResidueAlignment are dropped.
         """
-        # Alternative approach is to just use get function instead of [x] and default to np.nan and drop nans row-wise.
         mapping_key_mask = (np.isin(DI_data['residue1'], list(RA1.domain_to_protein.keys()))) & (np.isin(DI_data['residue2'], list(RA2.domain_to_protein.keys())))
         # Boolean-mask indexing already returns a copy, but that's made explicit here since the in-place
         # field assignment below would silently corrupt the caller's DI_data if this ever became a view.
@@ -170,12 +186,12 @@ class DirectInformationData:
         Parameters
         ----------
         DI_data : numpy.ndarray
-            Structured ndarray that contains columns with names "residue1", "residue2", and "DI" (Direct Information)
-        
+            Structured ndarray that contains the ``residue1``, ``residue2``, and ``DI`` (Direct Information) fields.
+
         Returns
         -------
         numpy.ndarray
-            Structured ndarray sorted upon column that is named DI in descending order.
+            Structured ndarray sorted by the ``DI`` field in descending order.
         """
         # [::-1] reverses the order from ascending DI Score to descending DI score.
         return np.sort(DI_data, order='DI')[::-1]
@@ -188,39 +204,45 @@ class DirectInformationData:
         Parameters
         ----------
         DI_data : numpy.ndarray
-            Structured ndarray that contains (at least) the first and second columns with the names "residue1" and "residue2" respectively.
-        
+            Structured ndarray that contains (at least) the ``residue1`` and ``residue2`` fields.
+
         Returns
         -------
         numpy.ndarray
-            Structured ndarray of DI pairs where residue 1 and residue 2 are greater than 4 residues apart.
+            Structured ndarray of DI pairs where ``residue1`` and ``residue2`` are greater than 4 residues apart.
         """
         return DI_data[abs(DI_data['residue1'] - DI_data['residue2']) > 4]
     
     @staticmethod
     def find_DI_with_residues(critical_residues_1 : Iterable[int], critical_residues_2 : Iterable[int], *mapped_resi_arrs: npt.NDArray, max_rank: Optional[int]=None) -> list[tuple[list, int]]:
         """
-        Function that takes an n number of ranked, mapped DI pairs and checks to see if they're in a list of potential residue indices.
-        
+        Searches one or more ranked, mapped DI arrays for pairs whose ``residue1`` and ``residue2`` are within `critical_residues_1` and `critical_residues_2`, respectively.
+
         Parameters
         ----------
         critical_residues_1 : collections.abc.Iterable of int
             Specific residue indices that a DI pair will be compared to. If the first residue of the DI pair is not one of these indices, it will not be appended to results.
         critical_residues_2 : collections.abc.Iterable of int
             Specific residue indices that a DI pair will be compared to. If the second residue of the DI pair is not one of these indices, it will not be appended to results.
+        *mapped_resi_arrs : numpy.ndarray
+            One or more ranked, mapped structured ndarrays with the ``residue1`` and ``residue2`` fields that are compared to critical residue indices and appended to results if in those indices and within `max_rank`. Rank restarts at 1 for each array.
         max_rank : int, optional
-            Maximum "rank", or position by score in descending order when sorted, of the DI pair considered.
-        *mapped_resi_arrs : tuple of numpy.ndarray
-            Tuple of ranked, mapped pairs that are compared to critical residue indices and appended to results if in those indices and within max_rank.
-        
+            Keyword-only. Maximum "rank", or position by score in descending order when sorted, of the DI pair considered, counted from 1. If None, all pairs are considered.
+
         Returns
         -------
         results : list of tuple of list of int, int
-            Results which consist of tuples where the first element is a list of residue1, residue2, and DI score, whereas the second element is the rank.
+            Results which consist of tuples where the first element is a list of the row's fields (e.g. ``residue1``, ``residue2``, and ``DI``), whereas the second element is the rank.
+
+        Raises
+        ------
+        TypeError
+            If a mapped array isn't a numpy.ndarray, e.g. when `max_rank` is passed positionally as in older versions.
         """
-        # max_rank can only be passed positionally (it precedes *mapped_resi_arrs), so catch a mapped array landing in its slot.
-        if max_rank is not None and not isinstance(max_rank, (int, np.integer)):
-            raise TypeError(f"max_rank must be an int or None, got {type(max_rank).__name__}. Pass None for max_rank before the mapped arrays if you don't want a limit.")
+        # Older versions took max_rank positionally before the arrays; catch that call style with a clear message.
+        for mapped_resi_arr in mapped_resi_arrs:
+            if not isinstance(mapped_resi_arr, np.ndarray):
+                raise TypeError(f"Expected numpy.ndarray mapped arrays, got {type(mapped_resi_arr).__name__}. max_rank is keyword-only, e.g. find_DI_with_residues(residues1, residues2, arr1, arr2, max_rank=300).")
         critical_residues_1 = set(critical_residues_1)
         critical_residues_2 = set(critical_residues_2)
         results = []
@@ -247,24 +269,24 @@ class DirectInformationData:
         model2 : str, int
             Number of model corresponding to the structure containing the second column of residues.
         chain1 : str
-            The chain present in the structure in model1 containing the first column of residues.
+            The chain present in the structure in `model1` containing the first column of residues.
         chain2 : str
-            The chain present in the structure in model2 containing the second column of residues.
+            The chain present in the structure in `model2` containing the second column of residues.
         pairs : numpy.ndarray
-            Structured ndarray that contains (at least) the first and second columns with the names "residue1" and "residue2" respectively. `ca_only` should be set to false and an additional "atom_name1" and "atom_name2" column should be added if atoms are specified per pair.
-        ca_only : bool
-            True if distance commands are for displaying distances between the two alpha-carbons of the residue pair. If false, specific_atom_names is used in lieu of "CA" as an atom identifier.
-        auth_res_ids : bool
-            If true, use the "auth_residue1" and "auth_residue2" columns instead of "residue1" and "residue2" columns. These residue ids correspond to the auth protein residue ids.
-        
+            Structured ndarray that contains (at least) the ``residue1`` and ``residue2`` fields. If atoms are specified per pair, `ca_only` should be set to False and the ``atom_name1`` and ``atom_name2`` fields should be present, e.g. from `get_min_dist_atom_info()`.
+        ca_only : bool, default True
+            If True, distance commands are between the two alpha-carbons of the residue pair. If False, the atom names in the ``atom_name1`` and ``atom_name2`` fields of `pairs` are used instead of ``"CA"``.
+        auth_res_ids : bool, default False
+            If True, use the ``auth_residue1`` and ``auth_residue2`` fields instead of the ``residue1`` and ``residue2`` fields. These residue ids correspond to the auth protein residue ids.
+
         Returns
         -------
         distance_commands : list of str
             List of distance commands generated between two residues with model and chain information needed, either between two alpha-carbons or the specified atoms.
-        
-        Note
-        ----
-        model1 and model2 can be equivalent if both columns involve residues referenced by the same model. The same would apply for chains if the residues are present on the same chain. 
+
+        Notes
+        -----
+        `model1` and `model2` can be equivalent if both columns involve residues referenced by the same model. The same would apply for chains if the residues are present on the same chain.
         """
         distance_commands: list[str] = []
         for i in range(np.shape(pairs)[0]):
@@ -292,15 +314,11 @@ class DirectInformationData:
         filepath : str
             Path of the file to write DirectInformation data to.
         pairs : numpy.ndarray
-            Ndarray of at-least pairs information (residue 1, residue 2) and optionally Direct Information to write to a file via numpy.savetxt().
-        delimiter : str
+            Ndarray of at least pairs information (residue 1, residue 2) and optionally Direct Information to write to a file via `numpy.savetxt()`. Either a structured ndarray (e.g. from `get_ranked_mapped_pairs()`) or a plain ``(n, 2)`` or ``(n, 3)`` ndarray. An empty ndarray writes an empty file.
+        delimiter : str, default ``'\\t'``
             Delimiter to separate columns of the pairs ndarray when writing to a file.
-        fmt : tuple of str, default=('%d', '%d', '%.3f)
-            format passed as an argument to numpy.savetxt() to define type of column and output format. Set to ('%d', '%d') if only two columns are present in the ndarray.
-
-        Returns
-        -------
-        None
+        fmt : tuple of str, default ``('%d', '%d', '%.3f')``
+            Format passed as an argument to `numpy.savetxt()` to define type of column and output format. Replaced with ``('%d', '%d')`` if `pairs` has only two fields or columns.
         """
         # Count columns from the dtype/shape rather than pairs[0], so an empty pairs ndarray writes an empty file instead of raising.
         n_columns = len(pairs.dtype.names) if pairs.dtype.names is not None else pairs.shape[1]

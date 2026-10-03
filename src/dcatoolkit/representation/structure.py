@@ -16,7 +16,12 @@ class StructureInformation:
     """
     Information regarding a protein structure, obtained from a protein structure file.
 
-    Uses fetch_pdb() to pull protein structure information from RCSB. Uses read_x_file() to supply a filepath to pull protein structure information from a file.
+    Uses `fetch_pdb()` to pull protein structure information from RCSB. Uses `read_mmCIF_file()` or `read_pdb_file()` to supply a filepath to pull protein structure information from a file.
+
+    See Also
+    --------
+    MMCIFInformation : Structure information from a PDBx/mmCIF file.
+    PDBInformation : Structure information from a PDB file.
     """
     @overload
     @staticmethod
@@ -32,28 +37,28 @@ class StructureInformation:
     @staticmethod
     def fetch_pdb(pdb_id: str, struc_format: Literal["mmcif", "pdb"]="mmcif", model_num: int=1) -> Union['MMCIFInformation', 'PDBInformation']:
         """
-        Fetches PDB as mmCIF file from RCSB and compiles the information into a StructureInformation instance.
+        Fetches a PDB entry from RCSB as a PDBx/mmCIF or PDB file and compiles the information into a StructureInformation instance.
 
         Parameters
         ----------
         pdb_id : str
             PDB ID to be fetched from the RCSB database.
-        struc_format : str
+        struc_format : {"mmcif", "pdb"}, default "mmcif"
             The format of the file to pull from the RCSB database.
-        model_num : int
+        model_num : int, default 1
             The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
-            
+
         Returns
         -------
-        StructureInformation
-            StructureInformation generated from pdbx.get_structure() function using the pdbx file fetched from RCSB.
-        
+        MMCIFInformation or PDBInformation
+            MMCIFInformation if `struc_format` is ``"mmcif"``, PDBInformation if it is ``"pdb"``.
+
         Raises
         ------
         TypeError
-            Fetched data was not found and returned None instead.
+            If the fetched data was not found and None was returned instead.
         ValueError
-            Structure format may be invalid (not PDBx/mmCIF or PDB).
+            If `struc_format` is not ``"mmcif"`` or ``"pdb"``.
         """
         fetched_data = rcsb.fetch(pdb_id, struc_format)
         if fetched_data is None:
@@ -69,19 +74,19 @@ class StructureInformation:
     @staticmethod
     def read_mmCIF_file(pdbx_filepath: str, model_num: int=1) -> 'MMCIFInformation':
         """
-        Reads PDB mmCIF file from filepath and compiles the information into a CIFInformation instance.
+        Reads a PDBx/mmCIF file from a filepath and compiles the information into an MMCIFInformation instance.
 
         Parameters
         ----------
         pdbx_filepath : str
-            Filepath of the PDB mmCIF file to be read.
-        model_num : int
+            Filepath of the PDBx/mmCIF file to be read.
+        model_num : int, default 1
             The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
 
         Returns
         -------
-        CIFInformation
-            CIFInformation generated from pdbx.get_structure() function using the PDBx file read from the pdbx_filepath.
+        MMCIFInformation
+            MMCIFInformation generated from the `biotite.structure.io.pdbx.get_structure()` function using the PDBx file read from `pdbx_filepath`.
         """
         pdbx_file = pdbx.CIFFile.read(pdbx_filepath)
         return MMCIFInformation(pdbx.get_structure(pdbx_file, model=model_num, use_author_fields=False), pdbx_file, model_num)
@@ -89,19 +94,19 @@ class StructureInformation:
     @staticmethod
     def read_pdb_file(pdb_filepath: str, model_num: int=1) -> 'PDBInformation':
         """
-        Reads PDB file from filepath and compiles the information into a PDBInformation instance.
+        Reads a PDB file from a filepath and compiles the information into a PDBInformation instance.
 
         Parameters
         ----------
         pdb_filepath : str
-            Filepath of the PDB mmCIF file to be read.
-        model_num : int
+            Filepath of the PDB file to be read.
+        model_num : int, default 1
             The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
 
         Returns
         -------
         PDBInformation
-            PDBInformation generated from pdb.get_structure() function using the PDB file read from the pdb_filepath.
+            PDBInformation generated from the `biotite.structure.io.pdb.get_structure()` function using the PDB file read from `pdb_filepath`.
         """
         pdb_file = pdb.PDBFile.read(pdb_filepath)
         return PDBInformation(pdb.get_structure(pdb_file, model=model_num), pdb_file, model_num)
@@ -109,18 +114,14 @@ class StructureInformation:
     @staticmethod
     def write_contacts_set(filepath : str, contacts_set : set[tuple[int, int]]) -> None:
         """
-        Write the contacts generated from get_contacts or general set of tuples of pairs.
+        Write the contacts generated from `get_contacts()` or a general set of tuples of pairs, sorted, one tab-separated pair per line.
 
         Parameters
         ----------
         filepath : str
-            Path of file to output contacts_set to.
-        contacts_set : set of tuple of int, int
+            Path of file to output `contacts_set` to.
+        contacts_set : set of tuple of (int, int)
             Set of tuples of pairs that represent contacts.
-        
-        Returns
-        -------
-        None
         """
         contacts_list = list(sorted(contacts_set))
         with open(filepath, 'w') as fs:
@@ -129,35 +130,41 @@ class StructureInformation:
 
 class MMCIFInformation(StructureInformation):
     """
-    Information regarding a protein structure, obtained from a protein structure file.
+    Information regarding a protein structure, obtained from a PDBx/mmCIF protein structure file.
 
     Parameters
     ----------
     structure : biotite.structure.AtomArray
-        Structure obtained from an RCSB entry with a provided pdbx/mmcif file with a specified model number.
-    pdbx_file : biotite.io.pdbx.CIFFile
-        mmCIF file that contains generic information and atomic information of the protein structure categorized into mmCIF blocks.
+        Structure obtained from a PDBx/mmCIF file with a specified model number, read with label (not auth) residue and chain ids.
+    pdbx_file : biotite.structure.io.pdbx.CIFFile
+        A PDBx/mmCIF file that contains generic information and atomic information of the protein structure categorized into mmCIF blocks.
     model_num : int
         The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
 
     Attributes
     ----------
-    self.full_sequences : dict of str, str
-        The full protein sequences from the pdbx file used to generate the structure stored in a dictionary where auth_chain_id is the key and the ProteinSequence object is the value.
-    self.non_missing_sequences : dict of str, biotite.sequence.ProteinSequence
-        The protein sequences, without missing residues, compiled in the structure of the StructureInformation instance stored in a dictionary where chain_id is the key and the sequence string is the value.
-    self.atom_data : numpy.ndarray, optional
-        Entries in the format 'ATOM', residue index, chain ID, auth residue index, auth chain ID, model number
-    self.het_atom_data : numpy.ndarray, optional
-        Array of entries in the format 'HETATM', residue index, chain ID, auth residue index, auth chain ID, model number
-    self.unique_chains : numpy.ndarray, optional
-        Array of unique asym_id entries which corresponds to unique chain IDs.
-    self.chain_auth_dict : dict of str, str, optional
-        Uses chain id as a key and provides auth chain id as a value.
-    self.auth_chain_dict : dict of str, str, optional
-        Uses auth chain id as a key and provides original/label chain id as a value. 
-    self.res_auth_dict : dict of str, tuple of int, int or optional 
-        Uses chain id as a key and an array of residue index and auth residue index as a value.
+    structure : biotite.structure.AtomArray
+        The `structure` supplied.
+    pdbx_file : biotite.structure.io.pdbx.CIFFile
+        The `pdbx_file` supplied.
+    model_num : int
+        The `model_num` supplied.
+    full_sequences : dict of {str : str}
+        The full protein sequences, including missing residues, from the PDBx/mmCIF file, keyed by auth chain id. See `_read_full_sequences()`.
+    non_missing_sequences : dict of {str : str}
+        The protein sequences, without missing residues, built from the non-hetero atoms of `structure`, keyed by label chain id.
+    first_block : str
+        Name of the first data block of `pdbx_file`.
+    unique_chains : numpy.ndarray
+        Array of unique ``label_asym_id`` entries of ``ATOM`` records, which corresponds to unique label chain ids.
+    chain_auth_dict : dict of {str : str}
+        Uses label chain id as a key and provides auth chain id as a value.
+    auth_chain_dict : dict of {str : str}
+        Uses auth chain id as a key and provides label chain id as a value.
+    atom_site_df : pandas.DataFrame
+        The full ``atom_site`` category of `pdbx_file` as strings, covering every model and alternate location.
+    atom_df : pandas.DataFrame
+        The ``ATOM`` rows of `atom_site_df`, with residue ids, atom ids, coordinates, and B-factors converted to numbers.
     """
     def __init__(self, structure, pdbx_file: pdbx.CIFFile, model_num: int):
         self.structure = structure
@@ -170,17 +177,21 @@ class MMCIFInformation(StructureInformation):
 
     def _read_full_sequences(self, pdbx_file: pdbx.CIFFile) -> dict[str, str]:
         """
-        Full chain sequences from entity_poly, falling back to entity_poly_seq when the one-letter column is absent (e.g. AlphaFold3 output).
-        
+        Full chain sequences from ``entity_poly``, falling back to ``entity_poly_seq`` when the one-letter column is absent (e.g. AlphaFold3 output).
+
         Parameters
         ----------
-        pdbx_file: biotite.io.pdbx.CIFFile
-            mmCIF file that contains generic information and atomic information of the protein structure categorized into mmCIF blocks.
+        pdbx_file : biotite.structure.io.pdbx.CIFFile
+            A PDBx/mmCIF file that contains generic information and atomic information of the protein structure categorized into mmCIF blocks.
 
         Returns
         -------
-        dict of str, str
+        dict of {str : str}
             Dictionary where the key is the auth chain identifier and the value is the full sequence, including missing residues, making up the chain's structure.
+
+        Notes
+        -----
+        biotite's `get_sequence()` reads ``entity_poly.pdbx_seq_one_letter_code_can``. When that column is missing, sequences are rebuilt from the three-letter residue names in ``entity_poly_seq`` for protein entities only, with unknown residue names becoming ``"X"``.
         """
 
         try:
@@ -222,15 +233,11 @@ class MMCIFInformation(StructureInformation):
 
     def _generate_auth_info(self) -> None:
         """
-        Ran as part of constructor function. Generates information needed to access auth information including auth_seq_id and auth_asym_id, which correspond to alternative chain ids and alternative residue indices.
-        
-        Note
-        ----
-        See attributes for details.
-        
-        Returns
-        -------
-        None
+        Run as part of the constructor. Generates information needed to access auth information including ``auth_seq_id`` and ``auth_asym_id``, which correspond to alternative residue indices and alternative chain ids.
+
+        Notes
+        -----
+        Sets the ``first_block``, ``unique_chains``, ``chain_auth_dict``, ``auth_chain_dict``, ``atom_site_df``, and ``atom_df`` attributes. See the class Attributes for details.
         """
         if len(self.pdbx_file.keys()) > 0:
             self.first_block = list(self.pdbx_file)[0]
@@ -260,10 +267,10 @@ class MMCIFInformation(StructureInformation):
         ----------
         chain_id : str
             The chain id supplied and selected for from the structure.
-        get_auth_res_ids : bool
-            True if you want alt_ids for residues indices, False if cif residue indexing is needed.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.            
+        get_auth_res_ids : bool, default False
+            If True, return the auth residue id (``auth_seq_id``) instead of the label residue id (``label_seq_id``).
+        auth_chain_id_supplied : bool, default False
+            If True, `chain_id` is the auth chain id found on the RCSB website.
 
         Returns
         -------
@@ -281,14 +288,14 @@ class MMCIFInformation(StructureInformation):
 
     def get_full_sequence(self, chain_id: str, auth_chain_id_supplied: bool=False) -> str:
         """
-        Get full sequence, including missing residues, from the specified chain off of RCSB.
+        Get the full sequence, including missing residues, of the specified chain from the PDBx/mmCIF file's entity records.
 
         Parameters
         ----------
         chain_id : str
             Chain id supplied. The full sequence, including missing residues, of this chain will be returned.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+        auth_chain_id_supplied : bool, default False
+            If True, `chain_id` is the auth chain id found on the RCSB website.
 
         Returns
         -------
@@ -302,19 +309,19 @@ class MMCIFInformation(StructureInformation):
         
     def get_non_missing_sequence(self, chain_id: str, auth_chain_id_supplied: bool=False) -> str:
         """
-        Get sequence, including only non-missing residues, from the specified chain off of RCSB.
+        Get the sequence of the specified chain, including only residues present (non-missing) in the structure.
 
         Parameters
         ----------
         chain_id : str
-            Chain id supplied. The full sequence, including only non-missing residues, of this chain will be returned.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+            Chain id supplied. The sequence of this chain's non-missing residues will be returned.
+        auth_chain_id_supplied : bool, default False
+            If True, `chain_id` is the auth chain id found on the RCSB website.
 
         Returns
         -------
         str
-            The full sequence, including only non-missing residues, of the chain specified.
+            The sequence of the chain specified, with missing residues excluded.
         """
         if auth_chain_id_supplied:
             original_chain_id = self.auth_chain_dict[chain_id]
@@ -324,23 +331,23 @@ class MMCIFInformation(StructureInformation):
         
     def get_chain_specific_structure(self, ca_only: bool, chain_id: str, remove_hetero=True, auth_chain_id_supplied: bool=False):
         """
-        Subsets structure attribute to select for chain specific portions of the structure.
+        Subsets the ``structure`` attribute to select for chain specific portions of the structure.
 
         Parameters
         ----------
         ca_only : bool
-            If true, the structure will also be subsetted for atom entries where the atom_name annotation is "CA" (referring to alpha-carbons)
+            If True, the structure will also be subsetted for atom entries where the ``atom_name`` annotation is ``"CA"`` (referring to alpha-carbons).
         chain_id : str
             The name of the chain to be selected for within the structure.
-        remove_hetero : bool, default=True
-            If true, the structure will also be subsetted for atom entries where the hetero annotation is False, thus removing heteroatoms.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+        remove_hetero : bool, default True
+            If True, the structure will also be subsetted for atom entries where the ``hetero`` annotation is False, thus removing heteroatoms.
+        auth_chain_id_supplied : bool, default False
+            If True, `chain_id` is the auth chain id found on the RCSB website.
 
         Returns
         -------
-        tuple of biotite.structure.AtomArray, biotite.structure.AtomArray
-            Two AtomArrays that refer to atoms in the first chain and second chain, respectively without accounting for the presence of heteroatoms if `remove_hetero` is True.
+        biotite.structure.AtomArray
+            The atoms of the chain, excluding heteroatoms if `remove_hetero` is True and non-alpha-carbons if `ca_only` is True.
         """
         if auth_chain_id_supplied:
             chain_id = self.auth_chain_dict[chain_id]
@@ -356,18 +363,23 @@ class MMCIFInformation(StructureInformation):
     
     def get_chain_site_data(self, ca_only: bool, chain_id: str, remove_hetero=True, auth_chain_id_supplied: bool=False):
         """
-        Subsets the atom_site dataframe to get atom information where the conditions are met.
+        Subsets the ``atom_df`` dataframe to get atom information where the conditions are met.
 
         Parameters
         ----------
         ca_only : bool
-            If true, the dataframe will also be subsetted for atom entries where the label_atom_id annotation is "CA" (referring to alpha-carbons)
+            If True, the dataframe will also be subsetted for atom entries where the ``label_atom_id`` column is ``"CA"`` (referring to alpha-carbons).
         chain_id : str
             The name of the chain to be selected for within the dataframe.
-        remove_hetero : bool, default=True
-            If true, the dataframe will also be subsetted for atom entries where the group_PDB annotation is ATOM rather than HETATM, thus removing heteroatoms.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+        remove_hetero : bool, default True
+            If True, the dataframe will also be subsetted for atom entries where the ``group_PDB`` column is ``"ATOM"`` rather than ``"HETATM"``, thus removing heteroatoms. ``atom_df`` already contains only ``ATOM`` rows, so this has no further effect.
+        auth_chain_id_supplied : bool, default False
+            If True, `chain_id` is the auth chain id found on the RCSB website.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The rows of ``atom_df`` for the chain that meet the conditions, across all models in the file.
         """
         atom_df = self.atom_df.copy()
         if ca_only:
@@ -388,14 +400,18 @@ class MMCIFInformation(StructureInformation):
         chain_id : str
             Chain id of the chain addressed for determining residue index mappings.
         seq_to_auth : bool
-            If True, this indicates the mapping uses the label_seq_id as a key and the auth_seq_id as a value. Otherwise, keys and values are switched.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+            If True, the mapping uses the ``label_seq_id`` as a key and the ``auth_seq_id`` as a value. Otherwise, keys and values are switched.
+        auth_chain_id_supplied : bool, default False
+            If True, `chain_id` is the auth chain id found on the RCSB website.
 
         Returns
         -------
-        dict of int, int
-            Dictionary with either label seq id or auth seq id as a key and the other as a value. The directionality is dependent on seq_to_auth.
+        dict of {int : int}
+            Dictionary with either label seq id or auth seq id as a key and the other as a value. The directionality is dependent on `seq_to_auth`.
+
+        Notes
+        -----
+        The mapping is built from alpha-carbon (``"CA"``) atoms, so residues without a CA atom are not included.
         """
         chain_df = self.get_chain_site_data(ca_only=True, chain_id=chain_id, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
         if seq_to_auth: 
@@ -405,16 +421,16 @@ class MMCIFInformation(StructureInformation):
     
     def get_valid_chain_residues(self, chain_id: str, auth_seq_id: bool=False, auth_chain_id_supplied: bool=False) -> list[tuple[int, str]]:
         """
-        Gets valid indexing for residues of a specified chain. This is directly analogous to get_non_missing_sequence, does not contain missing residues, and provides the corresponding indices as well.
+        Gets valid indexing for residues of a specified chain. This is directly analogous to `get_non_missing_sequence()`, does not contain missing residues, and provides the corresponding indices as well.
 
         Parameters
         ----------
         chain_id : str
             Chain id of the chain to be selected from the structure. This chain's sequence and corresponding residue indices are what are exclusively selected for.
-        auth_seq_id: bool
-            If True, the seq_ids that are the first element of the tuples in the returned list are auth_seq_ids. 
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+        auth_seq_id : bool, default False
+            If True, the residue ids that are the first element of the tuples in the returned list are auth residue ids (``auth_seq_id``) instead of label residue ids.
+        auth_chain_id_supplied : bool, default False
+            If True, `chain_id` is the auth chain id found on the RCSB website.
         
         Returns
         -------
@@ -433,23 +449,31 @@ class MMCIFInformation(StructureInformation):
 
     def generate_dist_matrix(self, ca_only: bool, chain1: str, chain2: str, auth_chain_id_supplied: bool=False):
         """
-        Generates distance matrix between two chains in the structure attribute.
+        Generates distance matrix between two chains in the ``structure`` attribute.
 
         Parameters
         ----------
         ca_only : bool
-            If True, only atoms that have the name "CA" are selected in the chains the distance matrix is calculated between.
+            If True, only atoms that have the name ``"CA"`` are selected in the chains the distance matrix is calculated between.
         chain1 : str
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
-            Chain id corresponding to the first column of residues in the structure.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+            Chain id corresponding to the second column of residues in the structure.
+        auth_chain_id_supplied : bool, default False
+            If True, `chain1` and `chain2` are auth chain ids found on the RCSB website.
 
         Returns
         -------
-        tuple of biotite.structure.AtomArray, biotite.structure.AtomArray, numpy.ndarray
+        tuple of (biotite.structure.AtomArray, biotite.structure.AtomArray, numpy.ndarray)
             Tuple containing the chain 1 structure, the chain 2 structure, and the distance matrix of chain 1 and chain 2's pairwise distances.
+
+        See Also
+        --------
+        get_contacts : Finds close residue pairs without building the full distance matrix.
+
+        Notes
+        -----
+        The matrix has one entry per atom pair, so its memory grows with the product of the two chains' atom counts (e.g. about 3.2 GB for two 20,000-atom chains).
         """
         chain1_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain1, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
         chain2_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
@@ -463,18 +487,22 @@ class MMCIFInformation(StructureInformation):
         Parameters
         ----------
         pairs : numpy.ndarray
-            Pairs structured ndarray with "residue1" and "residue2" columns.
+            Structured ndarray with the ``residue1`` and ``residue2`` fields, in label residue numbering.
         chain1 : str
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
             Chain id corresponding to the second column of residues in the structure.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
-            
+        auth_chain_id_supplied : bool, default False
+            If True, `chain1` and `chain2` are auth chain ids found on the RCSB website.
+
         Returns
         -------
         min_dist_pairs_atoms_arr : numpy.ndarray
-            Structured ndarray that has residue indices, auth residue indices (corresponding to the protein numbering), and atomic names in the format {'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']}
+            Structured ndarray that has residue indices, auth residue indices (corresponding to the protein numbering), and atomic names, with ``dtype={'names': ['residue1', 'residue2', 'auth_residue1', 'auth_residue2', 'atom_name1', 'atom_name2'], 'formats': [int, int, int, int, '<U10', '<U10']}``.
+
+        See Also
+        --------
+        DirectInformationData.get_dist_commands : Uses this output with ``ca_only=False``.
         """
         chain1_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain1, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
         chain2_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain2, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
@@ -500,27 +528,31 @@ class MMCIFInformation(StructureInformation):
 
     def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str, auth_seq_id: bool=False, auth_chain_id_supplied: bool=False) -> set[tuple[int, int]]:
         """
-        Get contacts from the structure attribute where the distance between two residues is less than the threshold.
+        Get contacts from the ``structure`` attribute where two residues have a pair of considered atoms within the threshold distance: any atoms, or only their alpha-carbons if `ca_only` is True.
 
         Parameters
         ----------
         ca_only : bool
-            If true, only consider alpha-carbon to alpha-carbon distances. 
+            If True, only consider alpha-carbon to alpha-carbon distances.
         threshold : float
-            Maximum distance to consider between two atoms.
+            Maximum distance, in Angstroms, between two atoms for their residues to be in contact (inclusive).
         chain1 : str
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
             Chain id corresponding to the second column of residues in the structure.
-        auth_seq_id : bool
-            True if you want auth_seq_ids for residues indices, False if cif residue indexing is needed.
-        auth_chain_id_supplied : bool
-            If True, the chain_id supplied is the auth chain id found on the RCSB website.
+        auth_seq_id : bool, default False
+            If True, residues are given as auth residue ids (``auth_seq_id``); otherwise as label residue ids (``label_seq_id``).
+        auth_chain_id_supplied : bool, default False
+            If True, `chain1` and `chain2` are auth chain ids found on the RCSB website.
 
         Returns
         -------
-        contacts_set : set of tuple of ints
-            Set of contacts, tuples with "residue1" and "residue2" from the structure that are within the distance threshold.
+        contacts_set : set of tuple of (int, int)
+            Set of contacts, as tuples of residue 1 from `chain1` and residue 2 from `chain2` that are within the distance threshold.
+
+        Notes
+        -----
+        If `chain1` and `chain2` are the same chain, each contact appears once with the lower residue first, and residues are not reported in contact with themselves. Close atoms are found with a KD-tree, so the full distance matrix of `generate_dist_matrix()` is never built.
         """
         # Get chain1 and chain2 structures.
         chain1_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain1, remove_hetero=True, auth_chain_id_supplied=auth_chain_id_supplied)
@@ -548,22 +580,29 @@ class MMCIFInformation(StructureInformation):
 
 class PDBInformation(StructureInformation):
     """
-    Information regarding a protein structure, obtained from a protein structure file.
+    Information regarding a protein structure, obtained from a PDB format protein structure file.
 
     Parameters
     ----------
     structure : biotite.structure.AtomArray
-        Structure obtained from an RCSB entry with a provided pdbx/mmcif file with a specified model number.
-    pdb_file : biotite.io.pdb.PDBFile
-        mmCIF file that contains generic information and atomic information of the protein structure categorized into mmCIF blocks.
+        Structure obtained from a PDB file with a specified model number. PDB files use author (auth) residue and chain ids.
+    pdb_file : biotite.structure.io.pdb.PDBFile
+        PDB file that contains generic information and atomic information of the protein structure.
     model_num : int
         The model number to access from the PDB to ensure an AtomArray is returned containing the atom information of the protein structure.
 
     Attributes
     ----------
-    self.non_missing_sequences : dict of str, biotite.sequence.ProteinSequence
-        The protein sequences, without missing residues, compiled in the structure of the StructureInformation instance stored in a dictionary where chain_id is the key and the sequence string is the value.
-    
+    structure : biotite.structure.AtomArray
+        The `structure` supplied.
+    pdb_file : biotite.structure.io.pdb.PDBFile
+        The `pdb_file` supplied.
+    model_num : int
+        The `model_num` supplied.
+    non_missing_sequences : dict of {str : str}
+        The protein sequences, without missing residues, built from the non-hetero atoms of `structure`, keyed by chain id.
+    unique_chains : numpy.ndarray
+        Array of the chain ids of the non-hetero atoms in `structure`.
     """
     def __init__(self, structure, pdb_file: pdb.PDBFile, model_num: int):
         self.structure = structure
@@ -586,6 +625,11 @@ class PDBInformation(StructureInformation):
         -------
         int
             The residue id of the first atom in the chain provided.
+
+        Raises
+        ------
+        ValueError
+            If `chain_id` is not one of the chains in the structure.
         """
         non_hetero_structure = self.structure[self.structure.hetero == False]
         if chain_id in self.unique_chains:
@@ -595,39 +639,37 @@ class PDBInformation(StructureInformation):
 
     def get_non_missing_sequence(self, chain_id: str) -> str:
         """
-        Get sequence, including only non-missing residues, from the specified chain.
+        Get the sequence of the specified chain, including only residues present (non-missing) in the structure.
 
         Parameters
         ----------
         chain_id : str
-            Chain id supplied. The full sequence, including only non-missing residues, of this chain will be returned.
+            Chain id supplied. The sequence of this chain's non-missing residues will be returned.
 
         Returns
         -------
         str
-            The full sequence, including only non-missing residues, of the chain specified.
+            The sequence of the chain specified, with missing residues excluded.
         """
         return self.non_missing_sequences[chain_id]
     
     def get_chain_specific_structure(self, ca_only: bool, chain_id: str, remove_hetero=True):
         """
-        Subsets structure attribute to select for chain specific portions of the structure.
+        Subsets the ``structure`` attribute to select for chain specific portions of the structure.
 
         Parameters
         ----------
         ca_only : bool
-            If true, the structure will also be subsetted for atom entries where the atom_name annotation is "CA" (referring to alpha-carbons)
-        chain1 : str
-            Chain id corresponding to the first column of residues in the structure.
-        chain2 : str
-            Chain id corresponding to the second column of residues in the structure.
-        remove_hetero : bool, default=True
-            If true, the structure will also be subsetted for atom entries where the hetero annotation is False, thus removing heteroatoms.
+            If True, the structure will also be subsetted for atom entries where the ``atom_name`` annotation is ``"CA"`` (referring to alpha-carbons).
+        chain_id : str
+            The name of the chain to be selected for within the structure.
+        remove_hetero : bool, default True
+            If True, the structure will also be subsetted for atom entries where the ``hetero`` annotation is False, thus removing heteroatoms.
 
         Returns
         -------
-        tuple of biotite.structure.AtomArray, biotite.structure.AtomArray
-            Two AtomArrays that refer to atoms in the first chain and second chain, respectively without accounting for the presence of heteroatoms if `remove_hetero` is True.
+        biotite.structure.AtomArray
+            The atoms of the chain, excluding heteroatoms if `remove_hetero` is True and non-alpha-carbons if `ca_only` is True.
         """
         selected_structure = self.structure
         if remove_hetero:
@@ -641,13 +683,13 @@ class PDBInformation(StructureInformation):
     
     def get_valid_chain_residues(self, chain_id: str) -> list[tuple[int, str]]:
         """
-        Gets valid indexing for residues of a specified chain. This is directly analogous to get_non_missing_sequence, does not contain missing residues, and provides the corresponding indices as well.
+        Gets valid indexing for residues of a specified chain. This is directly analogous to `get_non_missing_sequence()`, does not contain missing residues, and provides the corresponding indices as well.
 
         Parameters
         ----------
         chain_id : str
             Chain id of the chain to be selected from the structure. This chain's sequence and corresponding residue indices are what are exclusively selected for.
-        
+
         Returns
         -------
         list of tuple of int, str
@@ -658,21 +700,29 @@ class PDBInformation(StructureInformation):
 
     def generate_dist_matrix(self, ca_only: bool, chain1: str, chain2: str):
         """
-        Generates distance matrix between two chains in the structure attribute.
+        Generates distance matrix between two chains in the ``structure`` attribute.
 
         Parameters
         ----------
         ca_only : bool
-            If True, only atoms that have the name "CA" are selected in the chains the distance matrix is calculated between.
+            If True, only atoms that have the name ``"CA"`` are selected in the chains the distance matrix is calculated between.
         chain1 : str
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
-            Chain id corresponding to the first column of residues in the structure.
+            Chain id corresponding to the second column of residues in the structure.
 
         Returns
         -------
-        tuple of biotite.structure.AtomArray, biotite.structure.AtomArray, numpy.ndarray
+        tuple of (biotite.structure.AtomArray, biotite.structure.AtomArray, numpy.ndarray)
             Tuple containing the chain 1 structure, the chain 2 structure, and the distance matrix of chain 1 and chain 2's pairwise distances.
+
+        See Also
+        --------
+        get_contacts : Finds close residue pairs without building the full distance matrix.
+
+        Notes
+        -----
+        The matrix has one entry per atom pair, so its memory grows with the product of the two chains' atom counts (e.g. about 3.2 GB for two 20,000-atom chains).
         """
         chain1_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain1, remove_hetero=True)
         chain2_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain2, remove_hetero=True)
@@ -686,16 +736,20 @@ class PDBInformation(StructureInformation):
         Parameters
         ----------
         pairs : numpy.ndarray
-            Pairs structured ndarray with "residue1" and "residue2" columns.
+            Structured ndarray with the ``residue1`` and ``residue2`` fields.
         chain1 : str
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
             Chain id corresponding to the second column of residues in the structure.
-            
+
         Returns
         -------
         min_dist_pairs_atoms_arr : numpy.ndarray
-            Structured ndarray that has residue indices, auth residue indices (corresponding to the protein numbering), and atomic names in the format {'names': ['residue1','residue2','auth_residue1','auth_residue2','atom_name1','atom_name2'], 'formats': [int,int,int,int,'<U10','<U10']}
+            Structured ndarray that has residue indices, auth residue indices, and atomic names, with ``dtype={'names': ['residue1', 'residue2', 'auth_residue1', 'auth_residue2', 'atom_name1', 'atom_name2'], 'formats': [int, int, int, int, '<U10', '<U10']}``. PDB files already use auth numbering, so ``auth_residue1`` and ``auth_residue2`` repeat ``residue1`` and ``residue2``; they are included to match `MMCIFInformation.get_min_dist_atom_info()`.
+
+        See Also
+        --------
+        DirectInformationData.get_dist_commands : Uses this output with ``ca_only=False``.
         """
         chain1_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain1, remove_hetero=True)
         chain2_structure = self.get_chain_specific_structure(ca_only=False, chain_id=chain2, remove_hetero=True)
@@ -715,14 +769,14 @@ class PDBInformation(StructureInformation):
 
     def get_contacts(self, ca_only: bool, threshold: float, chain1: str, chain2: str) -> set[tuple[int, int]]:
         """
-        Get contacts from the structure attribute where the distance between two residues is less than the threshold.
+        Get contacts from the ``structure`` attribute where two residues have a pair of considered atoms within the threshold distance: any atoms, or only their alpha-carbons if `ca_only` is True.
 
         Parameters
         ----------
         ca_only : bool
-            If true, only consider alpha-carbon to alpha-carbon distances. 
+            If True, only consider alpha-carbon to alpha-carbon distances.
         threshold : float
-            Maximum distance to consider between two atoms.
+            Maximum distance, in Angstroms, between two atoms for their residues to be in contact (inclusive).
         chain1 : str
             Chain id corresponding to the first column of residues in the structure.
         chain2 : str
@@ -730,8 +784,12 @@ class PDBInformation(StructureInformation):
 
         Returns
         -------
-        contacts_set : set of tuple of ints
-            Set of contacts, tuples with "residue1" and "residue2" from the structure that are within the distance threshold.
+        contacts_set : set of tuple of (int, int)
+            Set of contacts, as tuples of residue 1 from `chain1` and residue 2 from `chain2` that are within the distance threshold, in the PDB file's (auth) residue numbering.
+
+        Notes
+        -----
+        If `chain1` and `chain2` are the same chain, each contact appears once with the lower residue first, and residues are not reported in contact with themselves. Close atoms are found with a KD-tree, so the full distance matrix of `generate_dist_matrix()` is never built.
         """
         # Get chain1 and chain2 structures.
         chain1_structure = self.get_chain_specific_structure(ca_only=ca_only, chain_id=chain1, remove_hetero=True)

@@ -6,24 +6,29 @@ import numpy.typing as npt
 class Pairs:
     """
     Object that contains a representation (as an ndarray) of pairs of entities that are related. This may extend to Direct Information Pairs or Structural contacts, where each residue is one component of the pair.
-    
-    Note
-    ----
-    Either a filepath or a ndarr has to be specified in order to produce a Pairs representation.
 
     Parameters
     ----------
     filepath : str, optional
-        Filepath of the pairs in tabular representation, with residue1 and residue2 in the first two columns and one pair per line. Any further columns (e.g. a DI score) are dropped. An empty file produces an empty Pairs.
+        Filepath of the pairs in tabular representation, with residue 1 and residue 2 in the first two columns and one pair per line. Any further columns (e.g. a DI score) are dropped. An empty file produces an empty Pairs.
     ndarr : numpy.ndarray, optional
-        Populated ndarray that contains pair information. See _normalize() for the accepted forms.
+        Populated ndarray that contains pair information. See `_normalize()` for the accepted forms.
     delimiter : str, optional
-        String used to separate the columns within a line of the file. Defaults to whitespace. See numpy.loadtxt() for details.
+        String used to separate the columns within a line of the file. Defaults to whitespace. See `numpy.loadtxt()` for details.
 
     Attributes
     ----------
     pairs : numpy.ndarray
-        Structured ndarray with dtype=[('residue1', int), ('residue2', int)] holding the pairs supplied by the user.
+        Structured ndarray with ``dtype=[('residue1', int), ('residue2', int)]`` holding the pairs supplied by the user.
+
+    Raises
+    ------
+    ValueError
+        If both or neither of `filepath` and `ndarr` are given.
+
+    Notes
+    -----
+    Exactly one of `filepath` or `ndarr` must be specified in order to produce a Pairs representation.
     """
     _DTYPE = [('residue1', int), ('residue2', int)]
 
@@ -39,22 +44,22 @@ class Pairs:
     @staticmethod
     def _normalize(ndarr: npt.NDArray) -> npt.NDArray:
         """
-        Coerces a plain or structured ndarray into a new structured ndarray with only the residue1/residue2 fields used throughout Pairs. All Pairs inputs (ndarrays, iterables, and files) pass through here, so this is the single place residue values are converted and checked. Any other fields or columns (e.g. a DI score) are dropped.
+        Coerces a plain or structured ndarray into a new structured ndarray with only the ``residue1`` and ``residue2`` fields used throughout Pairs. All Pairs inputs (ndarrays, iterables, and files) pass through here, so this is the single place residue values are converted and checked. Any other fields or columns (e.g. a DI score) are dropped.
 
         Parameters
         ----------
         ndarr : numpy.ndarray
-            Either a plain (n, k) ndarray with k >= 2, where residue1 and residue2 are the first two columns, or a structured ndarray carrying at least residue1/residue2 fields. Residue values may be ints or whole-number floats (e.g. 12.0, as in an all-float DI array). An empty plain ndarray produces an empty result.
+            Either a plain ``(n, k)`` ndarray with ``k >= 2``, where residue 1 and residue 2 are the first two columns, or a structured ndarray carrying at least the ``residue1`` and ``residue2`` fields. Residue values may be ints or whole-number floats (e.g. ``12.0``, as in an all-float DI array). An empty plain ndarray produces an empty result.
 
         Returns
         -------
         numpy.ndarray
-            Structured ndarray with dtype=[('residue1', int), ('residue2', int)]
+            Structured ndarray with ``dtype=[('residue1', int), ('residue2', int)]``.
 
         Raises
         ------
         ValueError
-            If a structured ndarray lacks residue1/residue2 fields, a plain ndarray is not 2d with at least 2 columns, or any residue value is not a whole number (including NaN and inf).
+            If a structured ndarray lacks the ``residue1`` or ``residue2`` field, a plain ndarray is not 2D with at least 2 columns, or any residue value is not a whole number (including NaN and inf).
         """
         if ndarr.dtype.names is not None:
             if 'residue1' not in ndarr.dtype.names or 'residue2' not in ndarr.dtype.names:
@@ -65,7 +70,7 @@ class Pairs:
             if ndarr.size == 0:
                 ndarr = ndarr.reshape(0, 2)
             if ndarr.ndim != 2 or ndarr.shape[1] < 2:
-                raise ValueError(f"Plain ndarray must have shape (n, 2), got {ndarr.shape}.")
+                raise ValueError(f"Plain ndarray must have shape (n, k) with k>=2, got {ndarr.shape}.")
             residue1, residue2 = ndarr[:, 0], ndarr[:, 1]
         structured = np.zeros(len(residue1), dtype=Pairs._DTYPE)
         with np.errstate(invalid='ignore'):
@@ -80,24 +85,24 @@ class Pairs:
     @staticmethod
     def to_ndarray(pairs: npt.NDArray) -> npt.NDArray:
         """
-        Converts a structured residue1/residue2 ndarray into a plain (n, 2) int ndarray, dropping any other fields (e.g. a DI score column). Ndarrays that are already unstructured are passed through unchanged.
+        Converts a structured ndarray with ``residue1`` and ``residue2`` fields into a plain ``(n, 2)`` int ndarray, dropping any other fields (e.g. ``DI``). Ndarrays that are already unstructured are passed through unchanged.
 
         Parameters
         ----------
         pairs : numpy.ndarray
-            Structured ndarray carrying at least residue1/residue2 fields, or an already-plain (n, 2) ndarray.
+            Structured ndarray carrying at least the ``residue1`` and ``residue2`` fields, or an already-plain ``(n, 2)`` ndarray.
 
         Returns
         -------
         numpy.ndarray
-            Plain (n, 2) int ndarray with residue1 in column 0 and residue2 in column 1.
+            Plain ``(n, 2)`` int ndarray with ``residue1`` in column 0 and ``residue2`` in column 1.
         """
         if pairs.dtype.names is None:
             return pairs
         return np.column_stack([pairs['residue1'], pairs['residue2']])
 
     @staticmethod
-    def load_from_file(filepath: str, delimiter: Optional[str]=None):
+    def load_from_file(filepath: str, delimiter: Optional[str]=None) -> 'Pairs':
         """
         Loads file containing delimited data in columns of residues being column 1 and column 2. Any further columns (e.g. a DI score) are dropped, and an empty file produces an empty Pairs.
 
@@ -106,29 +111,29 @@ class Pairs:
         filepath : str
             Filepath with residue columns corresponding to the indices of first and second components (proteins, chains, etc.) constituting a pair.
         delimiter : str, optional
-            String used to separate the columns within a line of the file. Defaults to whitespace. See numpy.loadtxt() for details.
+            String used to separate the columns within a line of the file. Defaults to whitespace. See `numpy.loadtxt()` for details.
 
         Returns
         -------
         Pairs
-            Pairs object with a loaded, structured ndarray with dtype=[('residue1', int), ('residue2', int)]
+            Pairs object with a loaded, structured ndarray with ``dtype=[('residue1', int), ('residue2', int)]``.
         """
         return Pairs(filepath=filepath, delimiter=delimiter)
 
     @staticmethod
-    def load_from_ndarray(ndarray: Union[npt.NDArray, Iterable[Iterable]]):
+    def load_from_ndarray(ndarray: Union[npt.NDArray, Iterable[Iterable]]) -> 'Pairs':
         """
-        Loads 2d ndarray, or iterable, of residue pairs in columnar format into Pairs object. Any values after the first two in each pair (e.g. a DI score) are dropped, and an empty input produces an empty Pairs.
+        Loads a 2D ndarray, structured ndarray, or iterable of residue pairs in columnar format into a Pairs object. Any values after the first two in each pair (e.g. a DI score) are dropped, and an empty input produces an empty Pairs.
 
         Parameters
         ----------
         ndarray : numpy.ndarray or Iterable of Iterable (excluding dict)
-            Ndarray or iterable of iterables with pairs of residue indices with residue1 and residue 2 in separate columns or as the first two elements. Iterables (including generators) are fully loaded into memory before conversion.
+            Ndarray or iterable of iterables with pairs of residue indices, with residue 1 and residue 2 in separate columns or as the first two elements. A structured ndarray needs the ``residue1`` and ``residue2`` fields. Iterables (including generators) are fully loaded into memory before conversion.
 
         Returns
         -------
         Pairs
-            Pairs object with a loaded, structured ndarray with dtype=[('residue1', int), ('residue2', int)]
+            Pairs object with a loaded, structured ndarray with ``dtype=[('residue1', int), ('residue2', int)]``.
         """
         # Build a plain array (no int dtype) so _normalize handles the int conversion and checks, same as file and ndarray input.
         if not isinstance(ndarray, np.ndarray):
@@ -137,18 +142,18 @@ class Pairs:
 
     @staticmethod
     def mirror_diagonal(pairs: npt.NDArray) -> npt.NDArray:
-        """ 
-        Flip 2D ndarray with 2 columns columnwise. Flips pair positions for diagonal-mirrored representation.
+        """
+        Flips pair positions for diagonal-mirrored representation, e.g. ``(1, 2)`` becomes ``(2, 1)``.
 
         Parameters
         ----------
         pairs : numpy.ndarray
-            2d array with (n, 2) shape.
+            Structured ndarray with at least the ``residue1`` and ``residue2`` fields.
 
         Returns
         -------
-        numpy.ndarray 
-            Values flipped along the column axis.
+        numpy.ndarray
+            A new structured ndarray with ``residue1`` and ``residue2`` swapped; other fields are unchanged.
         """
         mirrored = pairs.copy()
         mirrored['residue1'] = pairs['residue2']
@@ -158,21 +163,19 @@ class Pairs:
     @staticmethod
     def subset_pairs(pairs: npt.NDArray, number : Optional[int]=None) -> npt.NDArray:
         """
-        Picks out a subset of 'number' pairs if a number is supplied. Otherwise, returns all pairs.
+        Picks out the first `number` pairs if `number` is supplied. Otherwise, returns all pairs.
 
         Parameters
         ----------
         pairs : numpy.ndarray
-            Ndarray to select number of rows from.
-        number :  int, optional
-            Specific number of rows of pairs to subset.
+            Ndarray to select rows from.
+        number : int, optional
+            Specific number of rows of pairs to subset. If None, all pairs are returned.
 
         Returns
         -------
         numpy.ndarray
-            Subset of pairs from rows 0 to number.
-        pairs : numpy.ndarray
-            All pairs specified from the parameters section.
+            The first `number` rows of `pairs`, or all of `pairs` if `number` is None.
         """
         if number is not None:
             return pairs[:number, ]
@@ -182,17 +185,21 @@ class Pairs:
     @staticmethod
     def mirror_pairs(pairs: npt.NDArray) -> npt.NDArray:
         """
-        Produces combined array of pairs followed by their mirrored representation, e.g. [(1, 2), (3, 4)] becomes [(1, 2), (3, 4), (2, 1), (4, 3)].
+        Produces combined array of pairs followed by their mirrored representation, e.g. ``[(1, 2), (3, 4)]`` becomes ``[(1, 2), (3, 4), (2, 1), (4, 3)]``.
 
         Parameters
         ----------
         pairs : numpy.ndarray
-            Ndarray to mirror and vertically append to.
+            Structured ndarray to mirror and vertically append to, with at least the ``residue1`` and ``residue2`` fields.
 
         Returns
         -------
         numpy.ndarray
-            Combined ndarray of the original pairs followed by the mirrored pairs, with twice as many rows as pairs.
+            Combined ndarray of the original pairs followed by the mirrored pairs, with twice as many rows as `pairs`.
+
+        See Also
+        --------
+        mirror_diagonal : Produces the mirrored copy that is appended.
         """
         return np.concatenate([pairs, Pairs.mirror_diagonal(pairs)])
     
@@ -204,19 +211,24 @@ class Pairs:
         Parameters
         ----------
         pairs : numpy.ndarray
-            ndarray of pairs to select from or to mirror.
-        mirror : bool
-            Whether or not to append mirrored representation of pairs to the original pairs ndarray.
-        number : int
-            Specific number of rows of pairs to subset.
+            Structured ndarray of pairs with the ``residue1`` and ``residue2`` fields to select from or to mirror.
+        mirror : bool, default False
+            Whether or not to append the mirrored representation of the pairs to the original pairs ndarray.
+        number : int, optional
+            Specific number of rows of pairs to subset. If None, all pairs are kept.
 
         Returns
         -------
         numpy.ndarray
-            mirrored, subset version of pairs produced via subset_pairs() and mirror_pairs() on pairs.
+            The first `number` pairs, followed by their mirrored copies if `mirror` is True. With `mirror`, the result has ``2 * number`` rows.
+
+        See Also
+        --------
+        subset_pairs : Selects the first `number` pairs.
+        mirror_pairs : Appends the mirrored copies.
         """
-        # Check to see if user requested mirrored pairs, if so, add in pairs that are mirrored across diagonal
         pairs = Pairs.subset_pairs(pairs, number)
+        # Check to see if user requested mirrored pairs, if so, add in pairs that are mirrored across diagonal
         if mirror:
             pairs = Pairs.mirror_pairs(pairs)
         return pairs
