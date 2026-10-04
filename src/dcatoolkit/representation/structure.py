@@ -381,7 +381,7 @@ class MMCIFInformation(StructureInformation):
         pandas.DataFrame
             The rows of ``atom_df`` for the chain that meet the conditions, across all models in the file.
         """
-        atom_df = self.atom_df.copy()
+        atom_df = self.atom_df
         if ca_only:
             atom_df = atom_df[atom_df['label_atom_id'] == 'CA']
         if remove_hetero:
