@@ -78,9 +78,10 @@ class Pairs:
             structured['residue1'] = residue1
             structured['residue2'] = residue2
 
-        if residue1.dtype.kind == 'f' or residue2.dtype.kind == 'f':
-            if not (np.array_equal(structured['residue1'], residue1) and np.array_equal(structured['residue2'], residue2)):
-                raise ValueError("Residue indices must be whole numbers, but non-integer values were found.")
+        # Float residues are allowed (e.g. a plain DI array is all floats), but only if they survive the int cast unchanged.
+        has_float_residues = residue1.dtype.kind == 'f' or residue2.dtype.kind == 'f'
+        if has_float_residues and not (np.array_equal(structured['residue1'], residue1) and np.array_equal(structured['residue2'], residue2)):
+            raise ValueError("Residue indices must be whole numbers, but non-integer values were found.")
         return structured
 
     @staticmethod

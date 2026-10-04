@@ -74,13 +74,7 @@ test_answers = [
 ]
 
 def test_residue_alignments():
-    test_num = 0
-    for test_num, test_case in enumerate(test_cases):
-        domain_start, protein_start, first_seq, second_seq = test_case
-        module_result = list(ResidueAlignment(f"Test_{test_num}", f"Test {test_num}", domain_start, protein_start, first_seq, second_seq).reference_mapping.itertuples(index=False, name=None))
-        answer = list(zip(*test_answers[test_num]))
-        assert module_result == answer
-    for test_num, test_case in enumerate(test_cases_validation, start=test_num+1):
+    for test_num, test_case in enumerate(test_cases + test_cases_validation):
         domain_start, protein_start, first_seq, second_seq = test_case
         module_result = list(ResidueAlignment(f"Test_{test_num}", f"Test {test_num}", domain_start, protein_start, first_seq, second_seq).reference_mapping.itertuples(index=False, name=None))
         answer = list(zip(*test_answers[test_num]))

@@ -1,4 +1,3 @@
-import contextlib
 import io
 import re
 import string
@@ -111,7 +110,7 @@ class MSATools:
         Gaps are counted on the sequences as stored. To match the counts `filter_by_continuous_gaps()` uses, run this on an already filtered MSA, e.g. ``MSATools(msa.filter_by_continuous_gaps()).gap_frequency()``.
         """
         max_gap_counts = []
-        for header, sequence in self.MSA:
+        for _header, sequence in self.MSA:
             max_gap_counts.append(MSATools.get_sequence_max_cont_gaps(sequence))
         frequency_count_dict = dict(Counter(max_gap_counts))
         cumul_perc_dict = {}
@@ -188,15 +187,14 @@ class MSATools:
         TypeError
             If `destination` is not a filepath or a writable ``io.TextIOBase``.
         """
+        lines = (f"{header}\n{sequence}\n" for header, sequence in self.MSA)
         if isinstance(destination, (str, Path)):
-            file_context = open(destination, 'w')
+            with open(destination, 'w') as fs:
+                fs.writelines(lines)
         elif isinstance(destination, io.TextIOBase) and destination.writable():
-            file_context = contextlib.nullcontext(destination)
+            destination.writelines(lines)
         else:
             raise TypeError(f"Destination supplied is either not a filepath or is not a writeable TextIO object (got {type(destination).__name__}).")
-
-        with file_context as fs:
-            fs.writelines(f"{header}\n{sequence}\n" for header, sequence in self.MSA)
 
     def as_matrix(self) -> npt.NDArray:
         """

@@ -248,10 +248,8 @@ class DirectInformationData:
         critical_residues_2 = set(critical_residues_2)
         results = []
         for mapped_resi_arr in mapped_resi_arrs:
-            # count_rank represents the rank of the DI pair being evaluated, iterating over every new row considered.
-            count_rank = 0
-            for row in mapped_resi_arr:
-                count_rank += 1
+            # count_rank represents the rank of the DI pair being evaluated, counted from 1 for every new row considered.
+            for count_rank, row in enumerate(mapped_resi_arr, start=1):
                 if max_rank is not None and count_rank > max_rank:
                     break
                 if row['residue1'] in critical_residues_1 and row['residue2'] in critical_residues_2:

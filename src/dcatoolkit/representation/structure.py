@@ -240,7 +240,7 @@ class MMCIFInformation(StructureInformation):
         Sets the ``first_block``, ``unique_chains``, ``chain_auth_dict``, ``auth_chain_dict``, ``atom_site_df``, and ``atom_df`` attributes. See the class Attributes for details.
         """
         if len(self.pdbx_file.keys()) > 0:
-            self.first_block = list(self.pdbx_file)[0]
+            self.first_block = next(iter(self.pdbx_file))
             atom_site_category = self.pdbx_file[self.first_block].get('atom_site')
             self.chain_auth_dict: dict[str, str] = {}
             self.auth_chain_dict: dict[str, str] = {}
@@ -255,7 +255,7 @@ class MMCIFInformation(StructureInformation):
                     unique_entry = atom_data[atom_data[:,2] == unique_chain][0]
                     self.chain_auth_dict[unique_entry[2]] = unique_entry[4]
                     self.auth_chain_dict[unique_entry[4]] = unique_entry[2]
-                self.atom_site_df = pd.DataFrame(np.column_stack([atom_site_category[category].as_array() for category in atom_site_category.keys()]), columns=atom_site_category.keys())
+                self.atom_site_df = pd.DataFrame(np.column_stack([atom_site_category[category].as_array() for category in atom_site_category]), columns=atom_site_category.keys())
                 type_conversion_dict = {'label_seq_id': 'int64', 'auth_seq_id': 'int64', 'id': 'int64', 'Cartn_x': 'float', 'Cartn_y': 'float','Cartn_z': 'float', 'B_iso_or_equiv': 'float'}
                 self.atom_df = self.atom_site_df[self.atom_site_df['group_PDB'] == 'ATOM'].astype(type_conversion_dict)
 
@@ -443,9 +443,9 @@ class MMCIFInformation(StructureInformation):
         if auth_seq_id:
             seq_id_mapping = self.get_seq_id_mapping(chain_id=chain_id, seq_to_auth=True, auth_chain_id_supplied=auth_chain_id_supplied)
             auth_res_ids = [seq_id_mapping[res_id] for res_id in res_ids]
-            return list(zip(auth_res_ids, map(lambda symbol: ProteinSequence.convert_letter_3to1(symbol), res_names)))
+            return list(zip(auth_res_ids, map(ProteinSequence.convert_letter_3to1, res_names)))
         else:
-            return list(zip(res_ids, map(lambda symbol: ProteinSequence.convert_letter_3to1(symbol), res_names)))
+            return list(zip(res_ids, map(ProteinSequence.convert_letter_3to1, res_names)))
 
     def generate_dist_matrix(self, ca_only: bool, chain1: str, chain2: str, auth_chain_id_supplied: bool=False):
         """
@@ -696,7 +696,7 @@ class PDBInformation(StructureInformation):
             A list of residue information in sequential order reflecting the structure. The list consists of tuple elements where each tuple is the residue index and its corresponding one-letter amino acid.
         """
         chain_structure = self.get_chain_specific_structure(ca_only=True, chain_id=chain_id, remove_hetero=True)
-        return list(zip(chain_structure.res_id.tolist(), map(lambda symbol: ProteinSequence.convert_letter_3to1(symbol), chain_structure.res_name)))
+        return list(zip(chain_structure.res_id.tolist(), map(ProteinSequence.convert_letter_3to1, chain_structure.res_name)))
 
     def generate_dist_matrix(self, ca_only: bool, chain1: str, chain2: str):
         """
