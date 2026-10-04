@@ -1,7 +1,7 @@
-from context import MSATools
 import io
-import pytest
 
+import pytest
+from context import MSATools
 
 EXPECTED = [('>seq1', 'AC-DEF'), ('>seq2', 'GH-IJK')]
 

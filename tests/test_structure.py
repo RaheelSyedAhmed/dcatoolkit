@@ -1,5 +1,5 @@
-from context import MMCIFInformation
 import pytest
+from context import MMCIFInformation
 
 
 @pytest.fixture(scope="module")

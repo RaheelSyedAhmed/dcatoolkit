@@ -1,7 +1,6 @@
-from context import DirectInformationData, ResidueAlignment
 import numpy as np
 import pytest
-
+from context import DirectInformationData, ResidueAlignment
 
 DI_DTYPE = {'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)}
 

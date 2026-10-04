@@ -1,16 +1,16 @@
-import numpy as np
-import pandas as pd
-from scipy.spatial.distance import cdist
-from scipy.spatial import KDTree
+from typing import Literal, Union, overload
 
-import biotite.structure as struc
-import biotite.structure.io.pdbx as pdbx
-import biotite.structure.io.pdb as pdb
 import biotite.database.rcsb as rcsb
-from biotite.sequence import ProteinSequence
-
-from typing import Optional, Union, Literal, overload
+import biotite.structure as struc
+import biotite.structure.io.pdb as pdb
+import biotite.structure.io.pdbx as pdbx
+import numpy as np
 import numpy.typing as npt
+import pandas as pd
+from biotite.sequence import ProteinSequence
+from scipy.spatial import KDTree
+from scipy.spatial.distance import cdist
+
 
 class StructureInformation:
     """
@@ -123,7 +123,7 @@ class StructureInformation:
         contacts_set : set of tuple of (int, int)
             Set of tuples of pairs that represent contacts.
         """
-        contacts_list = list(sorted(contacts_set))
+        contacts_list = sorted(contacts_set)
         with open(filepath, 'w') as fs:
             for pair in contacts_list:
                 fs.write(str(pair[0]) + "\t" + str(pair[1]) + "\n")
@@ -171,7 +171,7 @@ class MMCIFInformation(StructureInformation):
         self.pdbx_file = pdbx_file
         self.model_num = model_num
         self.full_sequences = self._read_full_sequences(pdbx_file)
-        non_hetero_structure = self.structure[self.structure.hetero == False]
+        non_hetero_structure = self.structure[~self.structure.hetero]
         self.non_missing_sequences = {str(chain): str(sequence) for (chain, sequence) in list(zip(struc.get_chains(non_hetero_structure), struc.to_sequence(non_hetero_structure)[0]))}
         self._generate_auth_info()
 
@@ -354,7 +354,7 @@ class MMCIFInformation(StructureInformation):
         selected_structure = self.structure
         if remove_hetero:
             # Remove hetero atoms via hetero column of structure ndarray
-            selected_structure = self.structure[self.structure.hetero == False]
+            selected_structure = self.structure[~self.structure.hetero]
         if ca_only:
             # Consider selection of alpha-carbon atoms only
             selected_structure = selected_structure[selected_structure.atom_name == "CA"]
@@ -608,7 +608,7 @@ class PDBInformation(StructureInformation):
         self.structure = structure
         self.pdb_file = pdb_file
         self.model_num = model_num
-        non_hetero_structure = self.structure[self.structure.hetero == False]
+        non_hetero_structure = self.structure[~self.structure.hetero]
         self.non_missing_sequences = {str(chain): str(sequence) for (chain, sequence) in list(zip(struc.get_chains(non_hetero_structure), struc.to_sequence(non_hetero_structure)[0]))}
         self.unique_chains = struc.get_chains(non_hetero_structure)
 
@@ -631,7 +631,7 @@ class PDBInformation(StructureInformation):
         ValueError
             If `chain_id` is not one of the chains in the structure.
         """
-        non_hetero_structure = self.structure[self.structure.hetero == False]
+        non_hetero_structure = self.structure[~self.structure.hetero]
         if chain_id in self.unique_chains:
             return non_hetero_structure[non_hetero_structure.chain_id == chain_id][0].res_id
         else:
@@ -674,7 +674,7 @@ class PDBInformation(StructureInformation):
         selected_structure = self.structure
         if remove_hetero:
             # Remove hetero atoms via hetero column of structure ndarray
-            selected_structure = self.structure[self.structure.hetero == False]
+            selected_structure = self.structure[~self.structure.hetero]
         if ca_only:
             # Consider selection of alpha-carbon atoms only
             selected_structure = selected_structure[selected_structure.atom_name == "CA"]

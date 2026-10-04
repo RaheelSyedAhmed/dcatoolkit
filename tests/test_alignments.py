@@ -1,6 +1,6 @@
-from context import ResidueAlignment
 import pandas as pd
 import pytest
+from context import ResidueAlignment
 
 test_cases_description = """
 Test Case 1

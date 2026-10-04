@@ -4,7 +4,7 @@ threshold_AA = float(8)
 threshold_CA = float(10)
 
 
-with open("pdb_ids.txt", 'r') as fs:
+with open("pdb_ids.txt") as fs:
     data = fs.read().splitlines()
 
 for line in data:

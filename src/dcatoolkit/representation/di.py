@@ -1,9 +1,10 @@
-import numpy as np
-from typing import Optional, Union
 from collections.abc import Iterable
+
+import numpy as np
 import numpy.typing as npt
-from .pairs import Pairs
+
 from .alignment import ResidueAlignment
+from .pairs import Pairs
 
 
 class DirectInformationData:
@@ -69,7 +70,7 @@ class DirectInformationData:
         return DirectInformationData(np.loadtxt(DI_filepath, dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)}, ndmin=1))
 
     @staticmethod
-    def load_as_ndarray(ndarray: Union[npt.NDArray, Iterable[Iterable]]) -> 'DirectInformationData':
+    def load_as_ndarray(ndarray: npt.NDArray | Iterable[Iterable]) -> 'DirectInformationData':
         """
         Function to generate DirectInformationData from a plain ndarray or an iterable of pairs.
 
@@ -105,7 +106,7 @@ class DirectInformationData:
             DI_data = np.array([tuple(x) for x in ndarray], dtype={'names': ('residue1', 'residue2', 'DI'), 'formats': (int, int, float)})
             return DirectInformationData(DI_data)
     
-    def get_ranked_mapped_pairs(self, RA1: ResidueAlignment, RA2: ResidueAlignment, pairs_only: bool=True, mirror: bool=False, number: Optional[int]=None) -> npt.NDArray:
+    def get_ranked_mapped_pairs(self, RA1: ResidueAlignment, RA2: ResidueAlignment, pairs_only: bool=True, mirror: bool=False, number: int | None=None) -> npt.NDArray:
         """
         Uses DirectInformationData and Pairs interface methods to obtain ranked, mapped residues that are further than 4 residues apart. Residue Alignments can be the same for intra-domain / intra-protein mapping.
 
@@ -214,7 +215,7 @@ class DirectInformationData:
         return DI_data[abs(DI_data['residue1'] - DI_data['residue2']) > 4]
     
     @staticmethod
-    def find_DI_with_residues(critical_residues_1 : Iterable[int], critical_residues_2 : Iterable[int], *mapped_resi_arrs: npt.NDArray, max_rank: Optional[int]=None) -> list[tuple[list, int]]:
+    def find_DI_with_residues(critical_residues_1 : Iterable[int], critical_residues_2 : Iterable[int], *mapped_resi_arrs: npt.NDArray, max_rank: int | None=None) -> list[tuple[list, int]]:
         """
         Searches one or more ranked, mapped DI arrays for pairs whose ``residue1`` and ``residue2`` are within `critical_residues_1` and `critical_residues_2`, respectively.
 

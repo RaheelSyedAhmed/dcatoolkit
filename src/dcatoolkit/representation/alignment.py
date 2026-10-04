@@ -1,5 +1,6 @@
+
 import pandas as pd
-from typing import Optional
+
 
 class ResidueAlignment:
     """
@@ -37,14 +38,14 @@ class ResidueAlignment:
     protein_to_domain : dict of {int : int}
         A dictionary allowing for mapping from indices corresponding to the protein target sequence to the query HMM and Multiple Sequence Alignment.
     """
-    _INVALID_CHARS = {".", "_", "-"}
-    def __init__(self, domain_name: str, protein_name: str, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: Optional[list[tuple[int, str]]]=None) -> None:
+    _INVALID_CHARS = frozenset((".", "_", "-"))
+    def __init__(self, domain_name: str, protein_name: str, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: list[tuple[int, str]] | None=None) -> None:
         self.domain_name = domain_name
         self.protein_name = protein_name
         self.valid_residues = valid_residues
         self._set_reference_mapping(domain_start, protein_start, domain_text, protein_text, valid_residues)
 
-    def _row_stream(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: Optional[list[tuple[int, str]]]):
+    def _row_stream(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: list[tuple[int, str]] | None):
         """
         Generates one mapping row per aligned position in `domain_text` and `protein_text`, resolving each side's residue index independently.
 
@@ -90,7 +91,7 @@ class ResidueAlignment:
 
             yield domain_index, domain_aa, protein_aa, protein_index
 
-    def _set_reference_mapping(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: Optional[list[tuple[int, str]]]) -> None:
+    def _set_reference_mapping(self, domain_start: int, protein_start: int, domain_text: str, protein_text: str, valid_residues: list[tuple[int, str]] | None) -> None:
         """
         Set values for the ``reference_mapping`` attribute and the mapping dictionaries, ``domain_to_protein`` and ``protein_to_domain``.
 
@@ -125,7 +126,7 @@ class ResidueAlignment:
         self.protein_to_domain = dict(zip(protein_indices, domain_indices))
 
     @staticmethod
-    def load_from_align_file(align_filepath: str, valid_residues: Optional[list[tuple[int, str]]]=None) -> 'ResidueAlignment':
+    def load_from_align_file(align_filepath: str, valid_residues: list[tuple[int, str]] | None=None) -> 'ResidueAlignment':
         """
         Generate ResidueAlignment from a standard align file generated from HMM scan.
 
@@ -194,7 +195,7 @@ class ResidueAlignment:
         ValueError
             If the file ends partway through an entry (its non-blank line count isn't a multiple of 4).
         """
-        with open(align_filepath, 'r') as fs:
+        with open(align_filepath) as fs:
             alignment_entries: list[list[str]] = []
             current_entry: list[str] = []
             line_count = 0

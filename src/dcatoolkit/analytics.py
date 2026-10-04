@@ -1,13 +1,15 @@
+import contextlib
+import io
 import re
+import string
 from collections import Counter
 from collections.abc import Callable
-from typing import Optional, Union, Literal
-import string
-import io
+from pathlib import Path
+from typing import Literal
+
 import numpy as np
 import numpy.typing as npt
-from pathlib import Path
-import contextlib
+
 
 class MSATools:
     """
@@ -29,7 +31,7 @@ class MSATools:
         self.MSA = MSA
     
     @staticmethod
-    def load_from_file(msa_source: Union[str, io.IOBase, Path]) -> 'MSATools':
+    def load_from_file(msa_source: str | io.IOBase | Path) -> 'MSATools':
         """
         Generates MSATools object from an MSA file in aligned FASTA (``.afa``) format.
 
@@ -55,7 +57,7 @@ class MSATools:
         data = ""
         msa_entries: list[tuple[str, str]] = []
         if isinstance(msa_source, (str, Path)):
-            with open(msa_source, 'r') as fs:
+            with open(msa_source) as fs:
                 data = fs.read()
         elif isinstance(msa_source, io.BytesIO):
             data = msa_source.getvalue().decode()
@@ -120,7 +122,7 @@ class MSATools:
             cumul_perc_dict[key] = cumul_count / len(self.MSA)
         return (frequency_count_dict, cumul_perc_dict)
     
-    def filter_by_continuous_gaps(self, max_gaps: Optional[int]=None) -> list[tuple[str, str]]:
+    def filter_by_continuous_gaps(self, max_gaps: int | None=None) -> list[tuple[str, str]]:
         """
         Filter out entries in your MSA by the number of maximum continuous gaps specified unless None is provided. Also, removes ``"."`` characters and lowercase letters (insert positions) from the sequence.
 
@@ -172,7 +174,7 @@ class MSATools:
         non_alpha_counts = np.sum(~is_alpha, axis) / flat.shape[axis]
         return agg_func(non_alpha_counts)
 
-    def write(self, destination: Union[str, Path, io.TextIOBase]) -> None:
+    def write(self, destination: str | Path | io.TextIOBase) -> None:
         """
         Writes this MSA's headers and sequences to the destination specified, each header followed by its sequence on a single line.
 

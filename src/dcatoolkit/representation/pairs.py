@@ -1,7 +1,8 @@
-import numpy as np
-from typing import Optional, Union
 from collections.abc import Iterable
+
+import numpy as np
 import numpy.typing as npt
+
 
 class Pairs:
     """
@@ -30,9 +31,9 @@ class Pairs:
     -----
     Exactly one of `filepath` or `ndarr` must be specified in order to produce a Pairs representation.
     """
-    _DTYPE = [('residue1', int), ('residue2', int)]
+    _DTYPE = np.dtype([('residue1', int), ('residue2', int)])
 
-    def __init__(self, filepath: Optional[str]=None, ndarr: Optional[npt.NDArray]=None, delimiter: Optional[str]=None) -> None:
+    def __init__(self, filepath: str | None=None, ndarr: npt.NDArray | None=None, delimiter: str | None=None) -> None:
         if (filepath is not None and ndarr is not None) or (filepath is None and ndarr is None):
             raise ValueError("Please specify either a filepath or a NumPy array to populate your pairs.")
         elif filepath is not None:
@@ -102,7 +103,7 @@ class Pairs:
         return np.column_stack([pairs['residue1'], pairs['residue2']])
 
     @staticmethod
-    def load_from_file(filepath: str, delimiter: Optional[str]=None) -> 'Pairs':
+    def load_from_file(filepath: str, delimiter: str | None=None) -> 'Pairs':
         """
         Loads file containing delimited data in columns of residues being column 1 and column 2. Any further columns (e.g. a DI score) are dropped, and an empty file produces an empty Pairs.
 
@@ -121,7 +122,7 @@ class Pairs:
         return Pairs(filepath=filepath, delimiter=delimiter)
 
     @staticmethod
-    def load_from_ndarray(ndarray: Union[npt.NDArray, Iterable[Iterable]]) -> 'Pairs':
+    def load_from_ndarray(ndarray: npt.NDArray | Iterable[Iterable]) -> 'Pairs':
         """
         Loads a 2D ndarray, structured ndarray, or iterable of residue pairs in columnar format into a Pairs object. Any values after the first two in each pair (e.g. a DI score) are dropped, and an empty input produces an empty Pairs.
 
@@ -161,7 +162,7 @@ class Pairs:
         return mirrored
     
     @staticmethod
-    def subset_pairs(pairs: npt.NDArray, number : Optional[int]=None) -> npt.NDArray:
+    def subset_pairs(pairs: npt.NDArray, number : int | None=None) -> npt.NDArray:
         """
         Picks out the first `number` pairs if `number` is supplied. Otherwise, returns all pairs.
 
@@ -204,7 +205,7 @@ class Pairs:
         return np.concatenate([pairs, Pairs.mirror_diagonal(pairs)])
     
     @staticmethod
-    def get_pairs(pairs: npt.NDArray, mirror: bool=False, number: Optional[int]=None) -> npt.NDArray:
+    def get_pairs(pairs: npt.NDArray, mirror: bool=False, number: int | None=None) -> npt.NDArray:
         """
         Returns pairs based on user specification, offering options to produce mirrored representation of pairs and to select a specific number of pairs.
 

@@ -1,8 +1,9 @@
-from context import Pairs
+import os
+import tempfile
+
 import numpy as np
 import pytest
-import tempfile
-import os
+from context import Pairs
 
 
 def as_tuples(structured_array):

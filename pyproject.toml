@@ -52,3 +52,29 @@ docs = [
 lint = [
   "ruff",
 ]
+[tool.ruff]
+# The target Python version is inferred from requires-python above.
+# Lint the package and its tests; examples are standalone scripts.
+extend-exclude = [
+  "examples",
+  # Python 2 scripts that generated the reference contact files in tests/pdb_info; not valid Python 3.
+  "tests/pdb_info/interface_contacts_allatom_args.py",
+  "tests/pdb_info/interface_contacts_calpha_args.py",
+]
+
+[tool.ruff.lint]
+# Explicit rule selection, so results don't change with ruff's defaults between versions.
+select = [
+  "E4", "E7", "E9",  # pycodestyle errors: imports, statements, syntax
+  "F",               # Pyflakes: unused imports/variables, undefined names
+  "B",               # flake8-bugbear: likely bugs
+  "I",               # isort: import ordering
+  "UP",              # pyupgrade: modern syntax for the target Python version
+  "C4",              # flake8-comprehensions
+  "SIM",             # flake8-simplify
+  "PIE",             # flake8-pie: unnecessary code
+  "RUF",             # Ruff-specific rules
+]
+ignore = [
+  "B905",  # zip() without strict=: most zips are equal-length by construction, and ResidueAlignment deliberately truncates mismatched align texts.
+]
