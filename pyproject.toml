@@ -38,6 +38,11 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 
+[project.urls]
+Homepage = "https://github.com/RaheelSyedAhmed/dcatoolkit"
+Changelog = "https://github.com/RaheelSyedAhmed/dcatoolkit/blob/main/CHANGELOG.md"
+Issues = "https://github.com/RaheelSyedAhmed/dcatoolkit/issues"
+
 [project.optional-dependencies]
 tests = [
   "pytest",
