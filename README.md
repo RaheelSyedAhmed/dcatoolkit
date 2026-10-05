@@ -8,7 +8,7 @@
 ```bash
 pip install dcatoolkit
 
-# optional: adds matplotlib for the plotting example"
+# optional: adds matplotlib for the plotting example
 pip install "dcatoolkit[plot]"  
 ```
 
