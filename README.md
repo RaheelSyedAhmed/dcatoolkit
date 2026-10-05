@@ -1,6 +1,8 @@
 # dcatoolkit
  Collection of useful modules and representations for managing DCA output data.
 
+**Documentation:** https://dcatoolkit.readthedocs.io
+
 ## Installation
 
 ```bash

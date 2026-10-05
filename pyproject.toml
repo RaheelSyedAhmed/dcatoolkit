@@ -38,6 +38,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/RaheelSyedAhmed/dcatoolkit"
+Documentation = "https://dcatoolkit.readthedocs.io"
 Changelog = "https://github.com/RaheelSyedAhmed/dcatoolkit/blob/main/CHANGELOG.md"
 Issues = "https://github.com/RaheelSyedAhmed/dcatoolkit/issues"
 
