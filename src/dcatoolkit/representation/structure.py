@@ -1,3 +1,4 @@
+import io
 from typing import Literal, Union, overload
 
 import biotite.database.rcsb as rcsb
@@ -56,13 +57,18 @@ class StructureInformation:
         Raises
         ------
         TypeError
-            If the fetched data was not found and None was returned instead.
+            If the fetched data was not found and None was returned instead, or if RCSB returned binary data (``io.BytesIO``) instead of text.
         ValueError
             If `struc_format` is not ``"mmcif"`` or ``"pdb"``.
+        biotite.database.RequestError
+            If `pdb_id` is not a valid PDB ID (raised by `biotite.database.rcsb.fetch()`).
         """
         fetched_data = rcsb.fetch(pdb_id, struc_format)
         if fetched_data is None:
-            raise TypeError("RCSB fetch failed. Try fetch again.")
+            raise TypeError("RCSB fetch failed. Confirm RCSB's fetch API is available and, with stable internet connection, try fetch again.")
+        elif isinstance(fetched_data, io.BytesIO):
+            # rcsb.fetch returns binary formats (e.g. "bcif", or gzip=True) as BytesIO; the file readers below need text (StringIO).
+            raise TypeError(f"RCSB returned binary data for struc_format {struc_format!r}; only the text formats 'mmcif' and 'pdb' are supported.")
         elif struc_format == "mmcif":
             pdbx_file = pdbx.CIFFile.read(fetched_data)
             return MMCIFInformation(pdbx.get_structure(pdbx_file=pdbx_file, model=model_num, use_author_fields=False), pdbx_file, model_num)
@@ -255,7 +261,7 @@ class MMCIFInformation(StructureInformation):
                     unique_entry = atom_data[atom_data[:,2] == unique_chain][0]
                     self.chain_auth_dict[unique_entry[2]] = unique_entry[4]
                     self.auth_chain_dict[unique_entry[4]] = unique_entry[2]
-                self.atom_site_df = pd.DataFrame(np.column_stack([atom_site_category[category].as_array() for category in atom_site_category]), columns=atom_site_category.keys())
+                self.atom_site_df = pd.DataFrame(np.column_stack([atom_site_category[category].as_array() for category in atom_site_category]), columns=list(atom_site_category))
                 type_conversion_dict = {'label_seq_id': 'int64', 'auth_seq_id': 'int64', 'id': 'int64', 'Cartn_x': 'float', 'Cartn_y': 'float','Cartn_z': 'float', 'B_iso_or_equiv': 'float'}
                 self.atom_df = self.atom_site_df[self.atom_site_df['group_PDB'] == 'ATOM'].astype(type_conversion_dict)
 
