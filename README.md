@@ -10,7 +10,7 @@ pip install dcatoolkit
 pip install "dcatoolkit[plot]"  
 ```
 
-Requires Python 3.10+.
+Requires Python 3.12+.
 Upgrading from 0.2.x? See the [changelog](https://github.com/RaheelSyedAhmed/dcatoolkit/blob/main/CHANGELOG.md).
 
 ## Major Sections
