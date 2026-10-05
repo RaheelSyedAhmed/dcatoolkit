@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+This release updates the minimum Python version from 3.10 to 3.12 and requires biotite 1.7 or later, which brings performance improvements and type annotations. There are no other API changes. Users on Python 3.10 or 3.11 automatically keep receiving 0.3.x from `pip`.
+
+### Changed
+- **Requires Python ≥ 3.12 and biotite ≥ 1.7.** Tested with biotite 1.7.1, NumPy 2.5, pandas 3.0, and SciPy 1.18.
+- PDB files load about 6× faster with biotite 1.7.
+- `StructureInformation.fetch_pdb()` raises a clear `TypeError` if RCSB returns binary data, and invalid PDB IDs raise `biotite.database.RequestError`.
+
 ## 0.3.0
 
 This release makes contact search much faster, adds support for AlphaFold3 models, fixes several bugs, and tightens up the `Pairs` and `DirectInformationData` APIs. It contains **breaking changes**; see [Upgrading from 0.2.x](#upgrading-from-02x) below.
