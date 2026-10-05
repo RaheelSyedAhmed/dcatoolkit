@@ -33,15 +33,15 @@ C_R = btr1_complex_DI.get_ranked_mapped_pairs(ResidueAlignment.load_from_align_f
 contacts_critical = {15,16,17,18,19,20,103,104,105,106,107,108}
 
 # Printing out results, the DI pairs constricted to the residue indices specified and within the rank threshold of 300.
-print(DirectInformationData.find_DI_with_residues(cry1_contacts_0, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_0, contacts_critical, M_R, C_R, max_rank=300))
 print()
-print(DirectInformationData.find_DI_with_residues(cry1_contacts_1, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_1, contacts_critical, M_R, C_R, max_rank=300))
 print()
-print(DirectInformationData.find_DI_with_residues(cry1_contacts_2, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_2, contacts_critical, M_R, C_R, max_rank=300))
 print()
-print(DirectInformationData.find_DI_with_residues(cry1_contacts_3, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_3, contacts_critical, M_R, C_R, max_rank=300))
 print()
-print(DirectInformationData.find_DI_with_residues(cry1_contacts_4, contacts_critical, 300, M_R, C_R))
+print(DirectInformationData.find_DI_with_residues(cry1_contacts_4, contacts_critical, M_R, C_R, max_rank=300))
 
 # Writing out information of contacts within a threshold to a file.
 StructureInformation.write_contacts_set("examples/outputs/btr1_complex_contacts_0",btr1_complex_0.get_contacts(ca_only=False, threshold=8, chain1='A', chain2='B', auth_seq_id=True))

@@ -1,10 +1,11 @@
-from context import MMCIFInformation, PDBInformation
 from pathlib import Path
-import biotite.structure.io.pdbx as pdbx
+
 import biotite.database.rcsb as rcsb
+import biotite.structure.io.pdbx as pdbx
+from context import MMCIFInformation, PDBInformation
 
 pdb_id_chain_map = {}
-with open("tests/pdb_info/pdb_ids.txt", "r") as fs:
+with open("tests/pdb_info/pdb_ids.txt") as fs:
     pdb_id_data = fs.read().splitlines()
     for line in pdb_id_data:
         pdb_id, chain1, chain2 = line.split()
@@ -19,7 +20,7 @@ with open("tests/pdb_info/pdb_ids.txt", "r") as fs:
         pdb_id_chain_map[pdb_id] = (chain1, auth_chain1, chain2, auth_chain2)        
 
 def read_contacts(input_filepath: str) -> set[tuple[int, int]]:
-    with open(input_filepath, 'r') as fs:
+    with open(input_filepath) as fs:
         data = fs.read().splitlines()
     results = set()
     for pair in data:

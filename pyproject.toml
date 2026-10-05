@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dcatoolkit"
-version = "0.2.3"
+version = "0.3.0"
 description = "Collection of useful modules and representations for managing DCA output data."
 keywords = ["dca", "toolkit", "DI", "coevolution"]
 
@@ -22,10 +22,8 @@ maintainers = [
 
 dependencies = [
   "biotite>=1.0.1",
-  "matplotlib>=3.8.0",
   "numpy>=1.26.0",
   "pandas>=2.1.0",
-  "scikit-learn>=1.3",
   "scipy>=1.11.0",
 ]
 
@@ -40,6 +38,11 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 
+[project.urls]
+Homepage = "https://github.com/RaheelSyedAhmed/dcatoolkit"
+Changelog = "https://github.com/RaheelSyedAhmed/dcatoolkit/blob/main/CHANGELOG.md"
+Issues = "https://github.com/RaheelSyedAhmed/dcatoolkit/issues"
+
 [project.optional-dependencies]
 tests = [
   "pytest",
@@ -51,4 +54,33 @@ docs = [
 ]
 lint = [
   "ruff",
+]
+plot = [
+    "matplotlib>=3.10.9",
+]
+[tool.ruff]
+# The target Python version is inferred from requires-python above.
+# Lint the package and its tests; examples are standalone scripts.
+extend-exclude = [
+  "examples",
+  # Python 2 scripts that generated the reference contact files in tests/pdb_info; not valid Python 3.
+  "tests/pdb_info/interface_contacts_allatom_args.py",
+  "tests/pdb_info/interface_contacts_calpha_args.py",
+]
+
+[tool.ruff.lint]
+# Explicit rule selection, so results don't change with ruff's defaults between versions.
+select = [
+  "E4", "E7", "E9",  # pycodestyle errors: imports, statements, syntax
+  "F",               # Pyflakes: unused imports/variables, undefined names
+  "B",               # flake8-bugbear: likely bugs
+  "I",               # isort: import ordering
+  "UP",              # pyupgrade: modern syntax for the target Python version
+  "C4",              # flake8-comprehensions
+  "SIM",             # flake8-simplify
+  "PIE",             # flake8-pie: unnecessary code
+  "RUF",             # Ruff-specific rules
+]
+ignore = [
+  "B905",  # zip() without strict=: most zips are equal-length by construction, and ResidueAlignment deliberately truncates mismatched align texts.
 ]

@@ -2,7 +2,14 @@
 from importlib.metadata import version as _version
 
 __version__ = _version("dcatoolkit")
-from .representation import Pairs, DirectInformationData, StructureInformation, ResidueAlignment, MMCIFInformation, PDBInformation
 from .analytics import MSATools
+from .representation import (
+    DirectInformationData,
+    MMCIFInformation,
+    Pairs,
+    PDBInformation,
+    ResidueAlignment,
+    StructureInformation,
+)
 
-__all__ = ['Pairs', 'DirectInformationData', 'StructureInformation', 'ResidueAlignment', 'MMCIFInformation', 'PDBInformation', 'MSATools']
+__all__ = ['DirectInformationData', 'MMCIFInformation', 'MSATools', 'PDBInformation', 'Pairs', 'ResidueAlignment', 'StructureInformation']

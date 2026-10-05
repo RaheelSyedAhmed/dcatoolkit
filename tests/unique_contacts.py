@@ -1,7 +1,8 @@
 from pathlib import Path
 
+
 def read_contacts(input_filepath: str) -> list[tuple[int, int]]:
-    with open(input_filepath, 'r') as fs:
+    with open(input_filepath) as fs:
         data = fs.read().splitlines()
     contacts = set()
     for pair in data:
