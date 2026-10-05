@@ -42,20 +42,24 @@ Changelog = "https://github.com/RaheelSyedAhmed/dcatoolkit/blob/main/CHANGELOG.m
 Issues = "https://github.com/RaheelSyedAhmed/dcatoolkit/issues"
 
 [project.optional-dependencies]
-tests = [
-  "pytest",
-]
-docs = [
-  "sphinx",
-  "pdoc",
-  "numpydoc"
-]
-lint = [
-  "ruff",
-]
+# User-facing optional features (published to PyPI).
 plot = [
     "matplotlib>=3.10.9",
 ]
+
+[dependency-groups]
+# Development-only tools (not published). uv installs "dev" by default with `uv sync` / `uv run`.
+dev = [
+  "pytest",
+  "ruff",
+]
+docs = [
+  "sphinx",
+  "pydata-sphinx-theme",
+  "numpydoc",
+  "myst-parser>=5.1.0",
+]
+
 [tool.ruff]
 # The target Python version is inferred from requires-python above.
 # Lint the package and its tests; examples are standalone scripts.

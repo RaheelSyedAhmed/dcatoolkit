@@ -50,14 +50,19 @@ This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 ```bash
 git clone https://github.com/RaheelSyedAhmed/dcatoolkit.git
 cd dcatoolkit
-uv sync --all-extras
+uv sync  # Installs dcatoolkit and the dev group (pytest, ruff), which uv includes by default.
 ```
+
+Add `--group docs` to also install the documentation tools (Sphinx), and `--extra plot` for matplotlib, used by the plotting example. Use `uv sync --no-dev` to install only dcatoolkit and its dependencies, without pytest or ruff.
 
 Run the test suite (requires internet to fetch from RCSB):
 
 ```bash
 uv run pytest
+```
 
-uv sync --all-extras # Installs packages from tests, docs, lint, and plot.
-uv run ruff check # linting
+Lint:
+
+```bash
+uv run ruff check
 ```
